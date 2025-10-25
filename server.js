@@ -576,10 +576,56 @@ app.post("/api/auth/login", async (req, res) => {
   }
 });
 
-// ===== GENERIC ERROR HANDLER (MUST BE LAST, BEFORE LISTEN) =====
-app.use((err, req, res, next) => {
-  console.error("!!! UNHANDLED ERROR DETECTED:", err.stack || err); // Log the detailed error stack
-  res.status(500).send("Something broke on the server!"); // Send generic 500 response
+// POST Forgot Password
+app.post("/api/auth/forgot-password", async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ message: "Vui lòng cung cấp email." });
+  }
+  try {
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      return res.status(400).json({ message: "Email không tồn tại." });
+    }
+    const resetToken = jwt.sign(
+      { userId: user._id, email: user.email },
+      process.env.JWT_SECRET,
+      { expiresIn: "15m" }
+    );
+    // In dev, return token; in prod, send email
+    res.json({
+      message: "Reset token generated (in dev). Use this token to reset password.",
+      resetToken: resetToken
+    });
+  } catch (error) {
+    console.error("Lỗi forgot password:", error);
+    res.status(500).json({ message: "Lỗi máy chủ." });
+  }
+});
+
+// POST Reset Password
+app.post("/api/auth/reset-password", async (req, res) => {
+  const { token, newPassword } = req.body;
+  if (!token || !newPassword) {
+    return res.status(400).json({ message: "Token và mật khẩu mới là bắt buộc." });
+  }
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.userId);
+    if (!user) {
+      return res.status(400).json({ message: "Token không hợp lệ." });
+    }
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+    await user.save();
+    res.json({ message: "Mật khẩu đã được thay đổi thành công." });
+  } catch (error) {
+    console.error("Lỗi reset password:", error);
+    if (error.name === "JsonWebTokenError") {
+      return res.status(400).json({ message: "Token không hợp lệ." });
+    }
+    res.status(500).json({ message: "Lỗi máy chủ." });
+  }
 });
 // =========================================================
 
