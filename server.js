@@ -5,6 +5,8 @@ require("dotenv").config();
 const Game = require("./Game.js");
 const User = require("./User.js"); // User model for authentication
 const Review = require("./Review.js"); // Review model
+const Analytics = require("./Analytics.js"); // Analytics model for tracking
+const Notification = require("./Notification.js"); // Notification model
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const NodeCache = require("node-cache");
@@ -627,6 +629,119 @@ app.post("/api/auth/reset-password", async (req, res) => {
     res.status(500).json({ message: "Lỗi máy chủ." });
   }
 });
+
+// == Notification Routes ==
+
+// GET user's notifications
+app.get("/api/notifications", verifyToken, async (req, res) => {
+  try {
+    const { page = 1, limit = 20, unreadOnly = false } = req.query;
+
+    let query = { user: req.user._id };
+
+    if (unreadOnly === 'true') {
+      query.read = false;
+    }
+
+    const notifications = await Notification.find(query)
+      .sort({ createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .exec();
+
+    const total = await Notification.countDocuments(query);
+
+    res.json({
+      notifications,
+      totalPages: Math.ceil(total / limit),
+      currentPage: page,
+      total
+    });
+
+  } catch (error) {
+    console.error("Lỗi khi lấy notifications:", error);
+    res.status(500).json({ message: "Lỗi máy chủ khi lấy thông báo." });
+  }
+});
+
+// POST mark notification as read
+app.put("/api/notifications/:id/read", verifyToken, async (req, res) => {
+  try {
+    const notification = await Notification.findOneAndUpdate(
+      { _id: req.params.id, user: req.user._id },
+      { read: true, readAt: new Date() },
+      { new: true }
+    );
+
+    if (!notification) {
+      return res.status(404).json({ message: "Không tìm thấy thông báo." });
+    }
+
+    res.json({ message: "Đã đánh dấu đã đọc.", notification });
+
+  } catch (error) {
+    console.error("Lỗi khi đánh dấu đã đọc:", error);
+    res.status(500).json({ message: "Lỗi máy chủ." });
+  }
+});
+
+// GET notification count (unread)
+app.get("/api/notifications/count", verifyToken, async (req, res) => {
+  try {
+    const unreadCount = await Notification.countDocuments({
+      user: req.user._id,
+      read: false
+    });
+
+    res.json({ unreadCount });
+
+  } catch (error) {
+    console.error("Lỗi khi lấy số lượng thông báo:", error);
+    res.status(500).json({ message: "Lỗi máy chủ." });
+  }
+});
+
+// POST create notification (Admin only)
+app.post("/api/notifications", verifyAdmin, async (req, res) => {
+  try {
+    const { userId, type, title, message, data, priority = "medium" } = req.body;
+
+    if (!userId || !type || !title || !message) {
+      return res.status(400).json({
+        message: "UserId, type, title, và message là bắt buộc."
+      });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "Không tìm thấy user." });
+    }
+
+    const notification = new Notification({
+      user: userId,
+      type,
+      title,
+      message,
+      data,
+      priority
+    });
+
+    await notification.save();
+
+    res.status(201).json({
+      message: "Thông báo đã được tạo.",
+      notification
+    });
+
+  } catch (error) {
+    console.error("Lỗi khi tạo notification:", error);
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ message: error.message });
+    }
+    res.status(500).json({ message: "Lỗi máy chủ khi tạo thông báo." });
+  }
+});
+
 // =========================================================
 
 // --- Start Server ---
