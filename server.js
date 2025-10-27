@@ -969,5 +969,3 @@ app.post("/api/notifications", verifyAdmin, async (req, res) => {
 app.listen(PORT, () => {
   console.log(`API Server đang chạy tại http://localhost:${PORT}`);
 });
- 
- 
