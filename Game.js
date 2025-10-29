@@ -20,6 +20,6 @@ const GameSchema = new mongoose.Schema({
 });
 
 // Thêm text index để tối ưu hóa tìm kiếm
-GameSchema.index({ name: 'text', description: 'text' });
+GameSchema.index({ name: "text", description: "text" });
 
 module.exports = mongoose.model("Game", GameSchema);

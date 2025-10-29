@@ -40,40 +40,44 @@ mongoose
   })
   .catch((err) => console.error("Lỗi kết nối MongoDB:", err));
 
-// --- AUTH MIDDLEWARE --- 
+// --- AUTH MIDDLEWARE ---
 const verifyToken = async (req, res, next) => {
   try {
-    const token = req.headers.authorization?.split(' ')[1];
+    const token = req.headers.authorization?.split(" ")[1];
     if (!token) {
-      return res.status(401).json({ message: 'Không có token, không được phép truy cập' });
+      return res
+        .status(401)
+        .json({ message: "Không có token, không được phép truy cập" });
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = { _id: decoded.userId }; // Gắn ID người dùng vào request
     next();
   } catch (error) {
-    res.status(401).json({ message: 'Token không hợp lệ' });
+    res.status(401).json({ message: "Token không hợp lệ" });
   }
 };
 
 const verifyAdmin = async (req, res, next) => {
   try {
-    const token = req.headers.authorization?.split(' ')[1];
+    const token = req.headers.authorization?.split(" ")[1];
     if (!token) {
-      return res.status(401).json({ message: 'Không có token, không được phép truy cập' });
+      return res
+        .status(401)
+        .json({ message: "Không có token, không được phép truy cập" });
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findById(decoded.userId);
 
     if (!user || !user.isAdmin) {
-      return res.status(403).json({ message: 'Yêu cầu quyền admin' });
+      return res.status(403).json({ message: "Yêu cầu quyền admin" });
     }
 
     req.user = user; // Gắn thông tin user vào request
     next();
   } catch (error) {
-    res.status(401).json({ message: 'Token không hợp lệ' });
+    res.status(401).json({ message: "Token không hợp lệ" });
   }
 };
 
@@ -85,13 +89,13 @@ console.log(">>> SERVER: Defining API routes...");
 // 1. GET All Games (with sorting, filtering, and pagination)
 app.get("/api/games", async (req, res) => {
   try {
-    const { limit, sort, order = 'desc' } = req.query;
+    const { limit, sort, order = "desc" } = req.query;
 
     let query = Game.find();
 
     if (sort) {
       const sortOptions = {};
-      sortOptions[sort] = order === 'desc' ? -1 : 1;
+      sortOptions[sort] = order === "desc" ? -1 : 1;
       query = query.sort(sortOptions);
     }
 
@@ -101,7 +105,6 @@ app.get("/api/games", async (req, res) => {
 
     const games = await query.exec();
     res.json(games);
-
   } catch (err) {
     console.log("Lỗi server /api/games:", err.message);
     res.status(500).json({ message: err.message });
@@ -114,7 +117,7 @@ app.get("/api/games/find", async (req, res) => {
     const { genre, platform } = req.query;
     let query = {};
     // Sử dụng $in để tìm trong mảng
-    if (genre) query.genre = { $in: [genre] }; 
+    if (genre) query.genre = { $in: [genre] };
     if (platform) query.platform = { $in: [platform] };
     const games = await Game.find(query).limit(5);
     res.json(games);
@@ -143,21 +146,19 @@ app.get("/api/games/search", async (req, res) => {
     const games = await Game.find(
       { $text: { $search: query } },
       { score: { $meta: "textScore" } }
-    ).sort(
-      { score: { $meta: "textScore" } }
-    ).limit(10);
+    )
+      .sort({ score: { $meta: "textScore" } })
+      .limit(10);
 
     console.log(`MongoDB find completed. Found ${games.length} games.`);
     res.json(games);
   } catch (error) {
     console.error("!!! DETAILED SEARCH ERROR:", error);
     if (error.message && error.message.includes("text index required")) {
-      return res
-        .status(500)
-        .json({
-          message:
-            "Lỗi server: Cần tạo text index trong MongoDB (trên 'name' và 'description') để dùng $text search.",
-        });
+      return res.status(500).json({
+        message:
+          "Lỗi server: Cần tạo text index trong MongoDB (trên 'name' và 'description') để dùng $text search.",
+      });
     }
     res.status(500).json({ message: "Lỗi máy chủ khi tìm kiếm game." });
   }
@@ -168,7 +169,9 @@ app.get("/api/games/search", async (req, res) => {
 // GET all reviews for a game
 app.get("/api/games/:id/reviews", async (req, res) => {
   try {
-    const reviews = await Review.find({ game: req.params.id }).populate('user', 'email').sort({ createdAt: -1 });
+    const reviews = await Review.find({ game: req.params.id })
+      .populate("user", "email")
+      .sort({ createdAt: -1 });
     res.json(reviews);
   } catch (error) {
     console.error("Lỗi khi lấy đánh giá:", error);
@@ -188,7 +191,10 @@ app.post("/api/games/:id/reviews", verifyToken, async (req, res) => {
       return res.status(404).json({ message: "Không tìm thấy game." });
     }
 
-    const alreadyReviewed = await Review.findOne({ game: gameId, user: userId });
+    const alreadyReviewed = await Review.findOne({
+      game: gameId,
+      user: userId,
+    });
     if (alreadyReviewed) {
       return res.status(400).json({ message: "Bạn đã đánh giá game này rồi." });
     }
@@ -205,24 +211,22 @@ app.post("/api/games/:id/reviews", verifyToken, async (req, res) => {
     // Update game's rating and numReviews
     const reviews = await Review.find({ game: gameId });
     game.numReviews = reviews.length;
-    game.rating = reviews.reduce((acc, item) => item.rating + acc, 0) / reviews.length;
+    game.rating =
+      reviews.reduce((acc, item) => item.rating + acc, 0) / reviews.length;
 
     await game.save();
-    
-    myCache.del("allGames"); // Invalidate cache
 
     res.status(201).json({ message: "Cảm ơn bạn đã đánh giá!" });
-
   } catch (error) {
     console.error("Lỗi khi thêm đánh giá:", error);
-    if (error.name === 'ValidationError') {
-        return res.status(400).json({ message: error.message });
+    if (error.name === "ValidationError") {
+      return res.status(400).json({ message: error.message });
     }
     res.status(500).json({ message: "Lỗi máy chủ khi thêm đánh giá." });
   }
 });
 
-// 4. GET Single Game by ID - Moved LAST among GETs
+// 4. GET Single Game by ID
 app.get("/api/games/:id", async (req, res) => {
   try {
     const game = await Game.findById(req.params.id);
@@ -245,7 +249,6 @@ app.post("/api/games", verifyAdmin, async (req, res) => {
   try {
     const game = new Game(newGameData);
     await game.save();
-    myCache.del("allGames"); // Invalidate cache
     res.status(201).json(game);
   } catch (err) {
     if (err.name === "ValidationError") {
@@ -270,7 +273,6 @@ app.put("/api/games/:id", verifyAdmin, async (req, res) => {
         .status(404)
         .json({ message: "Không tìm thấy game để cập nhật" });
     }
-    myCache.del("allGames"); // Invalidate cache
     res.json(updatedGame);
   } catch (err) {
     if (err.name === "ValidationError") {
@@ -293,7 +295,6 @@ app.delete("/api/games/:id", verifyAdmin, async (req, res) => {
     if (!deletedGame) {
       return res.status(404).json({ message: "Không tìm thấy game để xóa" });
     }
-    myCache.del("allGames"); // Invalidate cache
     res.json({ message: "Đã xóa game thành công" });
   } catch (err) {
     if (err.name === "CastError") {
@@ -305,7 +306,6 @@ app.delete("/api/games/:id", verifyAdmin, async (req, res) => {
   }
 });
 
-
 // == Recommendation Route ==
 app.post("/api/recommendations", async (req, res) => {
   try {
@@ -314,7 +314,7 @@ app.post("/api/recommendations", async (req, res) => {
       return res.json([]);
     }
     const currentIds = cartItems.map((item) => item._id);
-    const currentGenres = [...new Set(cartItems.flatMap(item => item.genre))];
+    const currentGenres = [...new Set(cartItems.flatMap((item) => item.genre))];
     const recommendations = await Game.find({
       genre: { $in: currentGenres },
       _id: { $nin: currentIds },
@@ -350,7 +350,9 @@ app.post("/api/create-checkout-session", async (req, res) => {
             name: item.name,
             images: [imageUrl], // Must be an array of absolute URLs
             metadata: {
-              platform: Array.isArray(item.platform) ? item.platform.join(', ') : item.platform,
+              platform: Array.isArray(item.platform)
+                ? item.platform.join(", ")
+                : item.platform,
               id: item._id,
             },
           },
@@ -451,12 +453,9 @@ app.post("/api/chat", async (req, res) => {
     });
   } catch (error) {
     console.error("Lỗi API Chat:", error);
-    res
-      .status(500)
-      .json({
-        text:
-          "Rất tiếc, bộ não AI của tôi đang tạm nghỉ. Lỗi: " + error.message,
-      });
+    res.status(500).json({
+      text: "Rất tiếc, bộ não AI của tôi đang tạm nghỉ. Lỗi: " + error.message,
+    });
   }
 });
 
@@ -465,7 +464,7 @@ app.post("/api/chat", async (req, res) => {
 // GET all users
 app.get("/api/users", verifyAdmin, async (req, res) => {
   try {
-    const users = await User.find({}, '-password'); // Lấy tất cả user, bỏ trường password
+    const users = await User.find({}, "-password"); // Lấy tất cả user, bỏ trường password
     res.json(users);
   } catch (error) {
     console.error("Lỗi khi lấy danh sách người dùng:", error);
@@ -483,24 +482,24 @@ app.put("/api/users/:id/toggle-admin", verifyAdmin, async (req, res) => {
 
     // Không cho phép admin tự tước quyền của chính mình
     if (userToUpdate._id.equals(req.user._id)) {
-        return res.status(400).json({ message: "Không thể tự tước quyền admin của chính mình." });
+      return res
+        .status(400)
+        .json({ message: "Không thể tự tước quyền admin của chính mình." });
     }
 
     userToUpdate.isAdmin = !userToUpdate.isAdmin;
     await userToUpdate.save();
-    
+
     // Trả về user đã được cập nhật (không có password)
     const updatedUser = userToUpdate.toObject();
     delete updatedUser.password;
 
     res.json(updatedUser);
-
   } catch (error) {
     console.error("Lỗi khi thay đổi quyền admin:", error);
     res.status(500).json({ message: "Lỗi máy chủ" });
   }
 });
-
 
 // == Authentication Routes ==
 
@@ -522,17 +521,18 @@ app.post("/api/auth/register", async (req, res) => {
     const newUser = new User({
       email: email.toLowerCase(),
       password: hashedPassword,
+      isAdmin: false,
     });
     const savedUser = await newUser.save();
     const token = jwt.sign(
-      { userId: savedUser._id, email: savedUser.email },
+      { userId: savedUser._id, email: savedUser.email, isAdmin: savedUser.isAdmin },
       process.env.JWT_SECRET,
       { expiresIn: "1h" }
     );
     res.status(201).json({
       message: "Đăng ký thành công!",
       token: token,
-      user: { id: savedUser._id, email: savedUser.email },
+      user: { id: savedUser._id, email: savedUser.email, isAdmin: savedUser.isAdmin },
     });
   } catch (error) {
     console.error("Lỗi đăng ký:", error);
@@ -596,8 +596,9 @@ app.post("/api/auth/forgot-password", async (req, res) => {
     );
     // In dev, return token; in prod, send email
     res.json({
-      message: "Reset token generated (in dev). Use this token to reset password.",
-      resetToken: resetToken
+      message:
+        "Reset token generated (in dev). Use this token to reset password.",
+      resetToken: resetToken,
     });
   } catch (error) {
     console.error("Lỗi forgot password:", error);
@@ -609,7 +610,9 @@ app.post("/api/auth/forgot-password", async (req, res) => {
 app.post("/api/auth/reset-password", async (req, res) => {
   const { token, newPassword } = req.body;
   if (!token || !newPassword) {
-    return res.status(400).json({ message: "Token và mật khẩu mới là bắt buộc." });
+    return res
+      .status(400)
+      .json({ message: "Token và mật khẩu mới là bắt buộc." });
   }
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -644,18 +647,21 @@ app.get("/api/analytics", async (req, res) => {
     }
 
     // Tính toán thống kê
-    const totalSales = analytics.orders.reduce((sum, order) => sum + (order.total || 0), 0);
+    const totalSales = analytics.orders.reduce(
+      (sum, order) => sum + (order.total || 0),
+      0
+    );
     const totalOrders = analytics.orders.length;
     const averageOrderValue = totalOrders > 0 ? totalSales / totalOrders : 0;
 
     // Top games theo lượt xem
     const topGamesByViews = Object.entries(analytics.gameViews || {})
       .map(([gameId, views]) => {
-        const game = analytics.games.find(g => g._id === gameId);
+        const game = analytics.games.find((g) => g._id === gameId);
         return {
           gameId,
           gameName: game?.name || `Game ${gameId}`,
-          views
+          views,
         };
       })
       .sort((a, b) => b.views - a.views)
@@ -663,19 +669,19 @@ app.get("/api/analytics", async (req, res) => {
 
     // Top games theo doanh số
     const gameSales = {};
-    analytics.orders.forEach(order => {
-      order.items?.forEach(item => {
+    analytics.orders.forEach((order) => {
+      order.items?.forEach((item) => {
         gameSales[item.gameId] = (gameSales[item.gameId] || 0) + item.quantity;
       });
     });
 
     const topGamesBySales = Object.entries(gameSales)
       .map(([gameId, quantity]) => {
-        const game = analytics.games.find(g => g._id === gameId);
+        const game = analytics.games.find((g) => g._id === gameId);
         return {
           gameId,
           gameName: game?.name || `Game ${gameId}`,
-          quantity
+          quantity,
         };
       })
       .sort((a, b) => b.quantity - a.quantity)
@@ -689,9 +695,8 @@ app.get("/api/analytics", async (req, res) => {
       topGamesBySales,
       gameViews: analytics.gameViews,
       orders: analytics.orders,
-      games: analytics.games
+      games: analytics.games,
     });
-
   } catch (error) {
     console.error("Lỗi khi lấy analytics data:", error);
     res.status(500).json({ message: "Lỗi máy chủ khi lấy dữ liệu thống kê." });
@@ -716,10 +721,11 @@ app.post("/api/analytics/track-view", async (req, res) => {
     // Tăng lượt xem
     analytics.gameViews = analytics.gameViews || {};
     analytics.gameViews[gameId] = (analytics.gameViews[gameId] || 0) + 1;
+    analytics.markModified('gameViews'); // Mark the map as modified
 
     // Cập nhật danh sách games nếu có tên mới
     if (gameName) {
-      const existingGame = analytics.games.find(g => g._id === gameId);
+      const existingGame = analytics.games.find((g) => g._id === gameId);
       if (!existingGame) {
         analytics.games.push({ _id: gameId, name: gameName });
       }
@@ -729,7 +735,6 @@ app.post("/api/analytics/track-view", async (req, res) => {
     await analytics.save();
 
     res.json({ message: "Lượt xem đã được ghi nhận." });
-
   } catch (error) {
     console.error("Lỗi khi track game view:", error);
     res.status(500).json({ message: "Lỗi máy chủ khi ghi nhận lượt xem." });
@@ -742,7 +747,9 @@ app.post("/api/analytics/add-order", async (req, res) => {
     const orderData = req.body;
 
     if (!orderData.items || !Array.isArray(orderData.items)) {
-      return res.status(400).json({ message: "Dữ liệu đơn hàng không hợp lệ." });
+      return res
+        .status(400)
+        .json({ message: "Dữ liệu đơn hàng không hợp lệ." });
     }
 
     let analytics = await Analytics.findOne();
@@ -756,15 +763,15 @@ app.post("/api/analytics/add-order", async (req, res) => {
       _id: Date.now().toString(),
       ...orderData,
       date: new Date(),
-      status: 'completed'
+      status: "completed",
     };
 
     analytics.orders.push(newOrder);
 
     // Cập nhật danh sách games từ đơn hàng
-    orderData.items.forEach(item => {
+    orderData.items.forEach((item) => {
       if (item.name) {
-        const existingGame = analytics.games.find(g => g._id === item.gameId);
+        const existingGame = analytics.games.find((g) => g._id === item.gameId);
         if (!existingGame) {
           analytics.games.push({ _id: item.gameId, name: item.name });
         }
@@ -775,7 +782,6 @@ app.post("/api/analytics/add-order", async (req, res) => {
     await analytics.save();
 
     res.json({ message: "Đơn hàng đã được ghi nhận." });
-
   } catch (error) {
     console.error("Lỗi khi thêm đơn hàng:", error);
     res.status(500).json({ message: "Lỗi máy chủ khi ghi nhận đơn hàng." });
@@ -797,7 +803,6 @@ app.put("/api/analytics/reset-views", verifyAdmin, async (req, res) => {
     await analytics.save();
 
     res.json({ message: "Lượt xem đã được reset." });
-
   } catch (error) {
     console.error("Lỗi khi reset lượt xem:", error);
     res.status(500).json({ message: "Lỗi máy chủ khi reset lượt xem." });
@@ -820,8 +825,9 @@ app.post("/api/analytics/sync", async (req, res) => {
     // Merge game views
     if (gameViews) {
       analytics.gameViews = analytics.gameViews || {};
-      Object.keys(gameViews).forEach(gameId => {
-        analytics.gameViews[gameId] = (analytics.gameViews[gameId] || 0) + gameViews[gameId];
+      Object.keys(gameViews).forEach((gameId) => {
+        analytics.gameViews[gameId] =
+          (analytics.gameViews[gameId] || 0) + gameViews[gameId];
       });
     }
 
@@ -832,8 +838,8 @@ app.post("/api/analytics/sync", async (req, res) => {
 
     // Merge games
     if (games && Array.isArray(games)) {
-      games.forEach(game => {
-        const existingGame = analytics.games.find(g => g._id === game._id);
+      games.forEach((game) => {
+        const existingGame = analytics.games.find((g) => g._id === game._id);
         if (!existingGame) {
           analytics.games.push({ _id: game._id, name: game.name });
         }
@@ -844,7 +850,6 @@ app.post("/api/analytics/sync", async (req, res) => {
     await analytics.save();
 
     res.json({ message: "Dữ liệu đã được đồng bộ." });
-
   } catch (error) {
     console.error("Lỗi khi sync analytics:", error);
     res.status(500).json({ message: "Lỗi máy chủ khi đồng bộ dữ liệu." });
@@ -860,7 +865,7 @@ app.get("/api/notifications", verifyToken, async (req, res) => {
 
     let query = { user: req.user._id };
 
-    if (unreadOnly === 'true') {
+    if (unreadOnly === "true") {
       query.read = false;
     }
 
@@ -876,9 +881,8 @@ app.get("/api/notifications", verifyToken, async (req, res) => {
       notifications,
       totalPages: Math.ceil(total / limit),
       currentPage: page,
-      total
+      total,
     });
-
   } catch (error) {
     console.error("Lỗi khi lấy notifications:", error);
     res.status(500).json({ message: "Lỗi máy chủ khi lấy thông báo." });
@@ -899,7 +903,6 @@ app.put("/api/notifications/:id/read", verifyToken, async (req, res) => {
     }
 
     res.json({ message: "Đã đánh dấu đã đọc.", notification });
-
   } catch (error) {
     console.error("Lỗi khi đánh dấu đã đọc:", error);
     res.status(500).json({ message: "Lỗi máy chủ." });
@@ -911,11 +914,10 @@ app.get("/api/notifications/count", verifyToken, async (req, res) => {
   try {
     const unreadCount = await Notification.countDocuments({
       user: req.user._id,
-      read: false
+      read: false,
     });
 
     res.json({ unreadCount });
-
   } catch (error) {
     console.error("Lỗi khi lấy số lượng thông báo:", error);
     res.status(500).json({ message: "Lỗi máy chủ." });
@@ -925,11 +927,18 @@ app.get("/api/notifications/count", verifyToken, async (req, res) => {
 // POST create notification (Admin only)
 app.post("/api/notifications", verifyAdmin, async (req, res) => {
   try {
-    const { userId, type, title, message, data, priority = "medium" } = req.body;
+    const {
+      userId,
+      type,
+      title,
+      message,
+      data,
+      priority = "medium",
+    } = req.body;
 
     if (!userId || !type || !title || !message) {
       return res.status(400).json({
-        message: "UserId, type, title, và message là bắt buộc."
+        message: "UserId, type, title, và message là bắt buộc.",
       });
     }
 
@@ -944,19 +953,18 @@ app.post("/api/notifications", verifyAdmin, async (req, res) => {
       title,
       message,
       data,
-      priority
+      priority,
     });
 
     await notification.save();
 
     res.status(201).json({
       message: "Thông báo đã được tạo.",
-      notification
+      notification,
     });
-
   } catch (error) {
     console.error("Lỗi khi tạo notification:", error);
-    if (error.name === 'ValidationError') {
+    if (error.name === "ValidationError") {
       return res.status(400).json({ message: error.message });
     }
     res.status(500).json({ message: "Lỗi máy chủ khi tạo thông báo." });
