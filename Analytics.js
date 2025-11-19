@@ -2,7 +2,8 @@ const mongoose = require("mongoose");
 
 const AnalyticsSchema = new mongoose.Schema({
   gameViews: {
-    type: Object,
+    type: Map,
+    of: Number,
     default: {}
   },
   orders: [{

@@ -380,95 +380,40 @@ app.post("/api/chat", async (req, res) => {
   try {
     const { message, history } = req.body;
     const systemPrompt = `
-      Bạn là "GameBot AI", trợ lý game chuyên nghiệp của GameStore với IQ 180 và am hiểu sâu về game.
-      Bạn có khả năng phân tích tâm lý người dùng, đưa ra gợi ý cá nhân hóa và tư vấn chuyên sâu.
+      Bạn là "Trợ lý AI GameStore", một chatbot bán hàng vui vẻ và hữu ích.
+      Nhiệm vụ của bạn là phân tích yêu cầu của người dùng và CHỈ trả lời bằng một đối tượng JSON.
+      KHÔNG được trả lời bằng văn bản thông thường.
       
-      *** KIẾN THỨC CHUYÊN SÂU: ***
-      - Thể loại game: Nhập vai (RPG), Hành động (Action), Phiêu lưu (Adventure), Mô phỏng (Simulation), Indie, Chiến thuật (Strategy), Lén lút (Stealth), Quản lý (Management), Bắn súng (Shooter), Fantasy, Khoa học viễn tưởng (Sci-Fi), Metroidvania, Sinh tồn (Survival), Xây dựng (Building), Chặt chém (Hack & Slash), Thế giới mở (Open World), eSports, Kinh dị (Horror), Tâm lý (Psychological), Souls-like, Góc nhìn thứ nhất/thứ ba (FPS/TPS), Giải đố (Puzzle), Đua xe (Racing), Thể thao (Sports), Visual Novel, Roguelike, Tower Defense, MMORPG, MOBA.
-      - Nền tảng: PC, PlayStation 5 (PS5), Xbox Series X/S, Nintendo Switch, PS4, Xbox One, Mobile.
-      - Hiểu biết về: Steam, Epic Games, hệ thống đánh giá, trend game, multiplayer, co-op.
+      Các thể loại (genre) bạn biết: Nhập vai, Hành động, Phiêu lưu, Mô phỏng, Indie, Simulation, RPG, Chiến thuật, Lén lút, Quản lý, Bắn súng, Fantasy, Hợp tác, Khoa học viễn tưởng, Metroidvania, Sinh tồn, Xây dựng, Chặt chém, Thế giới mở, Steam Offline, eSports, Kinh dị, Tâm lý, Samurai, Thử thách cao, Souls-like, Góc nhìn thứ nhất, Chuyện kể, Giải đố, Đua xe, Thể thao, Chiến lược thời gian thực.
+      Các nền tảng (platform) bạn biết: PC, PlayStation 5, Xbox Series X, Nintendo Switch, PS4, Xbox One.
+
+      *** HƯỚNG DẪN MỚI: ***
+      - Nếu người dùng hỏi về MỘT TÊN GAME CỤ THỂ (ví dụ: "có Cyberpunk không?", "Elden Ring", "tìm God of War"), HÃY ƯU TIÊN tìm chính xác game đó. Trả về JSON với query CHỈ chứa tên game đó (dùng regex để tìm không phân biệt hoa thường).
+        Ví dụ User: "có cyberpunk 2077 không?" -> JSON: { "response": "Có ngay Cyberpunk 2077 cho bạn:", "query": { "name": { "$regex": "Cyberpunk 2077", "$options": "i" } } }
+      - Nếu người dùng chỉ hỏi THỂ LOẠI hoặc NỀN TẢNG (ví dụ: "game nhập vai", "game cho PC"), HÃY tìm theo các tiêu chí đó như bình thường.
+      - LUÔN LUÔN cố gắng trả về một đối tượng "query" nếu bạn nghĩ người dùng muốn tìm game. Nếu không chắc, trả về query rỗng {}.
+      - Ưu tiên sử dụng thông tin từ LỊCH SỬ (history) để hiểu ngữ cảnh của câu hỏi hiện tại.
+      *** KẾT THÚC HƯỚNG DẪN MỚI ***
+
+      Ví dụ:
+      User: "Xin chào"
+      JSON: { "response": "Xin chào! Tôi có thể giúp bạn tìm game không?", "query": {} }
+
+      User: "Tìm cho tôi vài game nhập vai"
+      JSON: { "response": "OK, tôi đã tìm thấy một số game 'Nhập vai' cho bạn:", "query": { "genre": "Nhập vai" } }
       
-      *** KHẢ NĂNG SIÊU VIỆT: ***
-      1. **Phân tích tâm lý người dùng** - Đọc hiểu ngụ ý, sở thích ẩn sau câu hỏi
-      2. **Gợi ý thông minh** - Dựa trên lịch sử, trend, và sở thích tương tự
-      3. **So sánh game** - Giúp người dùng lựa chọn giữa các game
-      4. **Tư vấn mua hàng** - Đề xuất game phù hợp ngân sách và cấu hình
-      5. **Cá nhân hóa** - Nhớ sở thích và đưa ra gợi ý phù hợp
-      
-      *** NGUYÊN TẮC TRẢI NGHIỆM: ***
-      - Luôn thân thiện, nhiệt tình và chuyên nghiệp
-      - Sử dụng emoji phù hợp để tạo không khí vui vẻ
-      - Đưa ra nhiều lựa chọn với lý do rõ ràng
-      - Hỏi thêm để hiểu rõ hơn nhu cầu người dùng
-      - Giữ câu trả lời ngắn gọn nhưng đầy đủ thông tin
-      
-      *** CÔNG THỨC TƯ VẤN: ***
-      1. Chào hỏi & xác nhận yêu cầu
-      2. Phân tích sâu nhu cầu (hỏi thêm nếu cần)
-      3. Đề xuất 3-5 lựa chọn phù hợp nhất
-      4. So sánh nhanh ưu/nhược điểm
-      5. Gợi ý hành động tiếp theo (xem chi tiết, mua hàng)
-      
-      *** VÍ DỤ TƯ VẤN CHUYÊN NGHIỆP: ***
-      
-      User: "Tìm game chill để thư giãn sau giờ làm"
-      JSON: { 
-        "response": "Hiểu ngay! Bạn cần game nhẹ nhàng để giảm stress. Tôi gợi ý vài lựa chọn tuyệt vời: 🌿", 
-        "query": { "genre": ["Mô phỏng", "Phiêu lưu", "Giải đố"] },
-        "suggestions": ["Stardew Valley", "Animal Crossing", "Unpacking"],
-        "reason": "Game có nhịp độ chậm, đồ họa đẹp, không áp lực"
-      }
-      
-      User: "Game bắn súng hay nhất hiện nay?"
-      JSON: { 
-        "response": "Tuyệt vời! Dưới đây là các tựa game bắn súng đỉnh cao nhất 2024: 🔥", 
-        "query": { "genre": ["Bắn súng", "Hành động"] },
-        "top_picks": ["Call of Duty MW3", "Counter-Strike 2", "Apex Legends"],
-        "comparison": "COD: campaign mạnh, CS2: competitive, Apex: battle royale"
-      }
-      
-      User: "PC yếu có chơi được gì không?"
-      JSON: { 
-        "response": "Dễ thôi! Có nhiều game hay mà cấu hình nhẹ lắm. Để tôi gợi ý: 💻", 
-        "query": { "platform": "PC" },
-        "filter": "low_spec",
-        "recommendations": ["Among Us", "Minecraft", "Stardew Valley"],
-        "requirements": "Tất cả đều chạy mượt trên card đồ họa tích hợp"
-      }
-      
-      User: "So sánh Elden Ring và Dark Souls"
-      JSON: { 
-        "response": "Câu hỏi hay! Cả hai đều là FromSoftware đỉnh cao nhưng khác nhau: ⚔️", 
-        "query": { "name": { "$regex": "Elden Ring|Dark Souls", "$options": "i" } },
-        "comparison": {
-          "elden_ring": "Open world rộng lớn, dễ tiếp cận hơn, đồ họa đẹp",
-          "dark_souls": "Linear, khó hơn, atmosphere u ám hơn"
-        },
-        "recommendation": "Elden Ring cho người mới, Dark Souls cho veteran"
-      }
-      
-      User: "Game co-op cho 2 người chơi"
-      JSON: { 
-        "response": "Chơi cùng bạn bè thì vui nhất! Đây là những game co-op đỉnh cao: 👥", 
-        "query": { "multiplayer": "co-op" },
-        "genres": ["Hành động", "Phiêu lưu", "Mô phỏng"],
-        "player_count": "2+"
-      }
+      User: "có elden ring không?" // Hướng dẫn mới
+      JSON: { "response": "Chắc chắn rồi, Elden Ring đây:", "query": { "name": { "$regex": "Elden Ring", "$options": "i" } } }
+
+      User: "game hành động trên PC"
+      JSON: { "response": "Tuyệt! Dưới đây là các game 'Hành động' cho 'PC':", "query": { "genre": "Hành động", "platform": "PC" } }
       
       User: "Cảm ơn"
-      JSON: { "response": "Rất vui được giúp bạn! Nếu cần thêm tư vấn, cứ tìm nhé! 🎮", "query": {} }
-      
-      User: "thời tiết hôm nay thế nào"
-      JSON: { "response": "Haha, tôi chuyên về game chứ không phải thời tiết đấy! Để tôi gợi ý game phù hợp với thời tiết nhé? ☀️", "query": {} }
-      
-      *** QUY TẮK QUAN TRỌNG: ***
-      - LUÔN trả về JSON hợp lệ
-      - "response": Nội dung trả lời thân thiện, có emoji
-      - "query": MongoDB query để tìm game
-      - "suggestions"/"recommendations": Array tên game gợi ý
-      - "reason": Lý do gợi ý (ngắn gọn)
-      - "comparison": So sánh game (nếu có)
-      - "filter": Bộ lọc đặc biệt (low_spec, trending, new_release)
+      JSON: { "response": "Không có gì! Chúc bạn chơi game vui vẻ!", "query": {} }
+
+      Nếu tôi hỏi ngoài chủ đề game, hãy từ chối:
+      User: "thủ đô của Việt Nam là gì"
+      JSON: { "response": "Rất tiếc, tôi chỉ là trợ lý GameStore và chỉ có thể giúp bạn về game thôi.", "query": {} }
     `;
     const formattedHistory = history
       .filter((msg) => msg.id !== 1)
@@ -714,10 +659,9 @@ app.get("/api/analytics", async (req, res) => {
       .map(([gameId, views]) => {
         const game = analytics.games.find((g) => g._id === gameId);
         return {
-          _id: gameId,
-          name: game?.name || `Game ${gameId}`,
+          gameId,
+          gameName: game?.name || `Game ${gameId}`,
           views,
-          price: game?.price || 0,
         };
       })
       .sort((a, b) => b.views - a.views)
@@ -735,13 +679,12 @@ app.get("/api/analytics", async (req, res) => {
       .map(([gameId, quantity]) => {
         const game = analytics.games.find((g) => g._id === gameId);
         return {
-          _id: gameId,
-          name: game?.name || `Game ${gameId}`,
-          sales: quantity,
-          price: game?.price || 0,
+          gameId,
+          gameName: game?.name || `Game ${gameId}`,
+          quantity,
         };
       })
-      .sort((a, b) => b.sales - a.sales)
+      .sort((a, b) => b.quantity - a.quantity)
       .slice(0, 5);
 
     res.json({
@@ -863,47 +806,6 @@ app.put("/api/analytics/reset-views", verifyAdmin, async (req, res) => {
   } catch (error) {
     console.error("Lỗi khi reset lượt xem:", error);
     res.status(500).json({ message: "Lỗi máy chủ khi reset lượt xem." });
-  }
-});
-
-// DELETE mock data from analytics
-app.delete("/api/analytics/cleanup", async (req, res) => {
-  try {
-    let analytics = await Analytics.findOne();
-    
-    if (!analytics) {
-      return res.status(404).json({ message: "Không tìm thấy analytics data" });
-    }
-
-    // Xóa các game có ID chứa "test" hoặc tên chứa "Test"
-    const originalGameCount = analytics.games.length;
-    analytics.games = analytics.games.filter(game => 
-      !game._id.includes("test") && 
-      !game.name.includes("Test") &&
-      !game.name.includes("test")
-    );
-
-    // Xóa các gameViews tương ứng
-    const newGameViews = {};
-    Object.keys(analytics.gameViews || {}).forEach(gameId => {
-      if (!gameId.includes("test")) {
-        newGameViews[gameId] = analytics.gameViews[gameId];
-      }
-    });
-    analytics.gameViews = newGameViews;
-
-    analytics.lastUpdated = new Date();
-    await analytics.save();
-
-    const removedCount = originalGameCount - analytics.games.length;
-    res.json({ 
-      message: `Đã xóa ${removedCount} mock games khỏi analytics`,
-      removedCount,
-      totalGames: analytics.games.length
-    });
-  } catch (error) {
-    console.error("Lỗi khi cleanup analytics:", error);
-    res.status(500).json({ message: "Lỗi server" });
   }
 });
 
