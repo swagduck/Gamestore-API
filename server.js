@@ -655,17 +655,23 @@ app.get("/api/analytics", async (req, res) => {
     const averageOrderValue = totalOrders > 0 ? totalSales / totalOrders : 0;
 
     // Top games theo lượt xem
-    const topGamesByViews = Object.entries(analytics.gameViews || {})
-      .map(([gameId, views]) => {
+    const topGamesByViews = [];
+    const gameViewsData = analytics.gameViews || {};
+    
+    // Chuyển Map/Object thành array và sort
+    Object.entries(gameViewsData).forEach(([gameId, views]) => {
+      if (typeof views === 'number' && views > 0) { // Chỉ lấy games có lượt xem > 0
         const game = analytics.games.find((g) => g._id === gameId);
-        return {
+        topGamesByViews.push({
           gameId,
           gameName: game?.name || `Game ${gameId}`,
           views,
-        };
-      })
-      .sort((a, b) => b.views - a.views)
-      .slice(0, 5);
+        });
+      }
+    });
+    
+    topGamesByViews.sort((a, b) => b.views - a.views);
+    const top5GamesByViews = topGamesByViews.slice(0, 5);
 
     // Top games theo doanh số
     const gameSales = {};
@@ -691,7 +697,7 @@ app.get("/api/analytics", async (req, res) => {
       totalSales,
       totalOrders,
       averageOrderValue,
-      topGamesByViews,
+      topGamesByViews: top5GamesByViews,
       topGamesBySales,
       gameViews: analytics.gameViews,
       orders: analytics.orders,
@@ -721,7 +727,6 @@ app.post("/api/analytics/track-view", async (req, res) => {
     // Tăng lượt xem
     analytics.gameViews = analytics.gameViews || {};
     analytics.gameViews[gameId] = (analytics.gameViews[gameId] || 0) + 1;
-    analytics.markModified('gameViews'); // Mark the map as modified
 
     // Cập nhật danh sách games nếu có tên mới
     if (gameName) {
