@@ -327,6 +327,53 @@ app.post("/api/recommendations", async (req, res) => {
   }
 });
 
+// Test endpoint for payment (without Stripe)
+app.post("/api/test-payment", async (req, res) => {
+  try {
+    const { cartItems } = req.body;
+    console.log('Test payment received:', cartItems);
+    
+    const processedItems = cartItems.map((item) => {
+      let finalPrice = item.price;
+      
+      if (item.discountType && item.discountType !== 'none') {
+        const now = new Date();
+        const start = item.discountStartDate ? new Date(item.discountStartDate) : null;
+        const end = item.discountEndDate ? new Date(item.discountEndDate) : null;
+        
+        const isDiscountActive = (!start || now >= start) && (!end || now <= end);
+        
+        if (isDiscountActive) {
+          if (item.discountType === 'percentage') {
+            finalPrice = item.price * (1 - item.discountValue / 100);
+          } else if (item.discountType === 'fixed') {
+            finalPrice = Math.max(0, item.price - item.discountValue);
+          }
+        }
+      }
+      
+      return {
+        name: item.name,
+        originalPrice: item.price,
+        discountedPrice: finalPrice,
+        quantity: item.quantity
+      };
+    });
+    
+    const total = processedItems.reduce((sum, item) => sum + item.discountedPrice * item.quantity, 0);
+    
+    res.json({
+      success: true,
+      items: processedItems,
+      totalAmount: total,
+      message: "Test payment successful"
+    });
+  } catch (error) {
+    console.error('Test payment error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // == Stripe Checkout Route ==
 app.post("/api/create-checkout-session", async (req, res) => {
   try {
