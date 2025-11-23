@@ -332,6 +332,26 @@ app.post("/api/create-checkout-session", async (req, res) => {
   try {
     const { cartItems } = req.body;
     const line_items = cartItems.map((item) => {
+      // Calculate discounted price
+      let finalPrice = item.price;
+      
+      // Check if discount is active
+      if (item.discountType && item.discountType !== 'none') {
+        const now = new Date();
+        const start = item.discountStartDate ? new Date(item.discountStartDate) : null;
+        const end = item.discountEndDate ? new Date(item.discountEndDate) : null;
+        
+        const isDiscountActive = (!start || now >= start) && (!end || now <= end);
+        
+        if (isDiscountActive) {
+          if (item.discountType === 'percentage') {
+            finalPrice = item.price * (1 - item.discountValue / 100);
+          } else if (item.discountType === 'fixed') {
+            finalPrice = Math.max(0, item.price - item.discountValue);
+          }
+        }
+      }
+
       // Basic validation for image URL
       let imageUrl = item.image;
       if (typeof imageUrl !== "string" || !imageUrl.startsWith("/")) {
@@ -341,7 +361,7 @@ app.post("/api/create-checkout-session", async (req, res) => {
         // Provide a fallback placeholder image URL if needed
         imageUrl = "https://via.placeholder.com/80x80?text=No+Image";
       } else {
-        imageUrl = `http://localhost:5173${item.image}`; // Prepend base URL
+        imageUrl = `http://localhost:5173${imageUrl}`; // Prepend base URL
       }
 
       return {
@@ -355,9 +375,13 @@ app.post("/api/create-checkout-session", async (req, res) => {
                 ? item.platform.join(", ")
                 : item.platform,
               id: item._id,
+              originalPrice: item.price,
+              discountedPrice: finalPrice,
+              discountType: item.discountType || 'none',
+              discountValue: item.discountValue || 0,
             },
           },
-          unit_amount: Math.round(item.price * 100), // Price in cents
+          unit_amount: Math.round(finalPrice * 100), // Use discounted price in cents
         },
         quantity: item.quantity,
       };
