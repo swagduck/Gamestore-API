@@ -17,6 +17,11 @@ const GameSchema = new mongoose.Schema({
     required: true,
     default: 0,
   },
+  viewCount: {
+    type: Number,
+    required: true,
+    default: 0,
+  },
   // Discount fields
   discountType: {
     type: String,
