@@ -227,6 +227,34 @@ app.post("/api/games/:id/reviews", verifyToken, async (req, res) => {
   }
 });
 
+// Track game view - increment viewCount directly in game
+app.post("/api/games/:id/view", async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const game = await Game.findByIdAndUpdate(
+      id,
+      { $inc: { viewCount: 1 } },
+      { new: true }
+    );
+    
+    if (!game) {
+      return res.status(404).json({ message: "Game không tồn tại." });
+    }
+    
+    console.log(`🎮 Incremented viewCount for ${game.name} to ${game.viewCount}`);
+    
+    res.json({ 
+      message: "Lượt xem đã được ghi nhận.",
+      viewCount: game.viewCount,
+      gameName: game.name
+    });
+  } catch (error) {
+    console.error("Lỗi khi ghi nhận lượt xem:", error);
+    res.status(500).json({ message: "Lỗi máy chủ khi ghi nhận lượt xem." });
+  }
+});
+
 // 4. GET Single Game by ID
 app.get("/api/games/:id", async (req, res) => {
   try {
