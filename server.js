@@ -754,24 +754,48 @@ app.get("/api/analytics", async (req, res) => {
     const totalOrders = analytics.orders.length;
     const averageOrderValue = totalOrders > 0 ? totalSales / totalOrders : 0;
 
-    // Top games theo lượt xem
-    const topGamesByViews = [];
-    const gameViewsData = analytics.gameViews || {};
-    
-    // Chuyển Map/Object thành array và sort
-    Object.entries(gameViewsData).forEach(([gameId, views]) => {
-      if (typeof views === 'number' && views > 0) { // Chỉ lấy games có lượt xem > 0
-        const game = analytics.games.find((g) => g._id === gameId);
-        topGamesByViews.push({
-          gameId,
-          gameName: game?.name || `Game ${gameId}`,
-          views,
-        });
+    // Get all games with viewCount > 0
+    const gamesWithViews = await Game.find({ viewCount: { $gt: 0 } })
+      .select('_id name viewCount')
+      .sort({ viewCount: -1 })
+      .limit(20);
+
+    // Top games theo lượt xem (from Game collection)
+    const topGamesByViews = gamesWithViews.map(game => ({
+      gameId: game._id,
+      gameName: game.name,
+      views: game.viewCount
+    }));
+
+    // Also include games with 0 views from analytics (for backward compatibility)
+    const analyticsGameViews = analytics.gameViews || {};
+    Object.entries(analyticsGameViews).forEach(([gameId, views]) => {
+      if (typeof views === 'number' && views > 0) {
+        // Check if already in topGamesByViews
+        const existing = topGamesByViews.find(item => item.gameId === gameId);
+        if (!existing) {
+          // Try to get game name
+          Game.findById(gameId).select('name').then(game => {
+            if (game) {
+              topGamesByViews.push({
+                gameId,
+                gameName: game.name,
+                views
+              });
+            }
+          }).catch(err => console.log('Error finding game:', err));
+        }
       }
     });
     
+    // Sort by views descending
     topGamesByViews.sort((a, b) => b.views - a.views);
-    const top5GamesByViews = topGamesByViews.slice(0, 5);
+
+    // Calculate total views from Game collection
+    const totalViews = await Game.aggregate([
+      { $group: { _id: null, totalViews: { $sum: '$viewCount' } } }
+    ]);
+    const totalViewCount = totalViews[0]?.totalViews || 0;
 
     // Top games theo doanh số
     const gameSales = {};
@@ -797,11 +821,13 @@ app.get("/api/analytics", async (req, res) => {
       totalSales,
       totalOrders,
       averageOrderValue,
-      topGamesByViews: top5GamesByViews,
+      topGamesByViews: topGamesByViews.slice(0, 10), // Top 10
       topGamesBySales,
-      gameViews: analytics.gameViews,
+      totalViews: totalViewCount,
+      gameViews: analytics.gameViews, // Keep for backward compatibility
       orders: analytics.orders,
       games: analytics.games,
+      lastUpdated: new Date().toISOString()
     });
   } catch (error) {
     console.error("Lỗi khi lấy analytics data:", error);
