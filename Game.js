@@ -3,6 +3,11 @@ const mongoose = require("mongoose");
 const GameSchema = new mongoose.Schema({
   name: { type: String, required: true },
   price: { type: Number, required: true },
+  isFree: {
+    type: Boolean,
+    required: true,
+    default: false
+  },
   platform: [{ type: String, required: true }],
   genre: [{ type: String, required: true }],
   image: { type: String, required: true },
@@ -42,6 +47,22 @@ const GameSchema = new mongoose.Schema({
 
 // Thêm text index để tối ưu hóa tìm kiếm
 GameSchema.index({ name: "text", description: "text" });
+
+// Method to get final price (free or discounted)
+GameSchema.methods.getFinalPrice = function() {
+  // If game is free, return 0
+  if (this.isFree) {
+    return 0;
+  }
+  
+  // If not free but has active discount, return discounted price
+  if (this.hasActiveDiscount()) {
+    return this.getDiscountedPrice();
+  }
+  
+  // Return original price
+  return this.price;
+};
 
 // Method to check if game discount is active
 GameSchema.methods.hasActiveDiscount = function() {
