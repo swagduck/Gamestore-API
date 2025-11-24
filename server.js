@@ -38,7 +38,12 @@ app.use(cors({
     'https://my-ecommerce-1cgddc1zl-swagducks-projects.vercel.app',
     'https://my-ecommerce-j53i8rvb3-swagducks-projects.vercel.app',
     'https://my-ecommerce-mwav2gsgx-swagducks-projects.vercel.app',
-    'https://my-ecommerce-qxf9s05no-swagducks-projects.vercel.app'
+    'https://my-ecommerce-qxf9s05no-swagducks-projects.vercel.app',
+    'https://my-ecommerce-bm4zando6-swagducks-projects.vercel.app',
+    'https://my-ecommerce-l6qx27hyb-swagducks-projects.vercel.app',
+    'https://my-ecommerce-3zubgbbde-swagducks-projects.vercel.app',
+    'https://my-ecommerce-3rku918l9-swagducks-projects.vercel.app',
+    'https://my-ecommerce-mdzgyhhog-swagducks-projects.vercel.app'
   ],
   credentials: true
 }));
