@@ -27,8 +27,22 @@ const PORT = process.env.PORT || 4000;
 
 // --- Middlewares ---
 console.log(">>> SERVER: Setting up middleware...");
-app.use(cors());
-console.log(">>> SERVER: CORS middleware applied.");
+app.use(cors({
+  origin: [
+    'http://localhost:5173',
+    'http://localhost:5174',
+    'https://my-ecommerce-app-red.vercel.app',
+    'https://my-ecommerce-3mdxa4qep-swagducks-projects.vercel.app',
+    'https://my-ecommerce-ijvt7e7kl-swagducks-projects.vercel.app',
+    'https://my-ecommerce-ahkdafcwc-swagducks-projects.vercel.app',
+    'https://my-ecommerce-1cgddc1zl-swagducks-projects.vercel.app',
+    'https://my-ecommerce-j53i8rvb3-swagducks-projects.vercel.app',
+    'https://my-ecommerce-mwav2gsgx-swagducks-projects.vercel.app',
+    'https://my-ecommerce-qxf9s05no-swagducks-projects.vercel.app'
+  ],
+  credentials: true
+}));
+console.log(">>> SERVER: CORS middleware applied with specific origins.");
 app.use(express.json());
 console.log(">>> SERVER: JSON middleware applied.");
 
