@@ -910,7 +910,7 @@ app.post("/api/analytics/add-order", async (req, res) => {
 
     // Thêm đơn hàng mới
     const newOrder = {
-      _id: Date.now().toString(),
+      _id: orderData.id || Date.now().toString(), // Use frontend ID or fallback to timestamp
       ...orderData,
       date: new Date(),
       status: "completed",
