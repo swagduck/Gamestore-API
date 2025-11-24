@@ -5,27 +5,77 @@ mongoose.connect('mongodb+srv://hoanguy:Z162wMcmQhICmXcb@mongodb.p9ncspb.mongodb
 .then(async () => {
   console.log('Connected to MongoDB');
   
-  // Image URLs mapping with regex patterns
-  const gamePatterns = [
-    { pattern: /hogwarts/i, image: 'https://res.cloudinary.com/dfkac2u3x/image/upload/v1761107166/hogwarts-optimized.jpg' },
-    { pattern: /elden.*ring/i, image: 'https://res.cloudinary.com/dfkac2u3x/image/upload/v1761107166/eldenring-optimized.jpg' },
-    { pattern: /cyberpunk/i, image: 'https://res.cloudinary.com/dfkac2u3x/image/upload/v1761107166/cyberpunk-optimized.jpg' },
-    { pattern: /god.*war/i, image: 'https://res.cloudinary.com/dfkac2u3x/image/upload/v1761107166/godofwar-optimized.jpg' },
-    { pattern: /stardew/i, image: 'https://res.cloudinary.com/dfkac2u3x/image/upload/v1761107166/stardew-optimized.jpg' },
-    { pattern: /starfield/i, image: 'https://res.cloudinary.com/dfkac2u3x/image/upload/v1761107166/starfield-optimized.jpg' },
-    { pattern: /zelda/i, image: 'https://res.cloudinary.com/dfkac2u3x/image/upload/v1761107166/zelda-optimized.jpg' },
-    { pattern: /red.*dead/i, image: 'https://res.cloudinary.com/dfkac2u3x/image/upload/v1761107166/rdr2-optimized.jpg' }
-  ];
+  // Default image for games without specific images
+  const defaultImage = 'https://res.cloudinary.com/dfkac2u3x/image/upload/v1761107166/cyberpunk-optimized.jpg';
   
-  // Update each game pattern
-  for (const { pattern, image } of gamePatterns) {
-    const result = await Game.updateMany(
-      { name: { $regex: pattern } },
-      { $set: { image } }
+  // Get all games
+  const allGames = await Game.find({});
+  console.log(`Found ${allGames.length} games`);
+  
+  let updatedCount = 0;
+  
+  // Update each game with appropriate image based on name
+  for (const game of allGames) {
+    let imageUrl = defaultImage;
+    
+    // Specific image mappings
+    if (game.name.toLowerCase().includes('hogwarts')) {
+      imageUrl = 'https://res.cloudinary.com/dfkac2u3x/image/upload/v1761107166/hogwarts-optimized.jpg';
+    } else if (game.name.toLowerCase().includes('elden')) {
+      imageUrl = 'https://res.cloudinary.com/dfkac2u3x/image/upload/v1761107166/eldenring-optimized.jpg';
+    } else if (game.name.toLowerCase().includes('cyberpunk')) {
+      imageUrl = 'https://res.cloudinary.com/dfkac2u3x/image/upload/v1761107166/cyberpunk-optimized.jpg';
+    } else if (game.name.toLowerCase().includes('god') && game.name.toLowerCase().includes('war')) {
+      imageUrl = 'https://res.cloudinary.com/dfkac2u3x/image/upload/v1761107166/godofwar-optimized.jpg';
+    } else if (game.name.toLowerCase().includes('stardew')) {
+      imageUrl = 'https://res.cloudinary.com/dfkac2u3x/image/upload/v1761107166/stardew-optimized.jpg';
+    } else if (game.name.toLowerCase().includes('starfield')) {
+      imageUrl = 'https://res.cloudinary.com/dfkac2u3x/image/upload/v1761107166/starfield-optimized.jpg';
+    } else if (game.name.toLowerCase().includes('zelda')) {
+      imageUrl = 'https://res.cloudinary.com/dfkac2u3x/image/upload/v1761107166/zelda-optimized.jpg';
+    } else if (game.name.toLowerCase().includes('red') && game.name.toLowerCase().includes('dead')) {
+      imageUrl = 'https://res.cloudinary.com/dfkac2u3x/image/upload/v1761107166/rdr2-optimized.jpg';
+    } else if (game.name.toLowerCase().includes('gta') || game.name.toLowerCase().includes('grand theft auto')) {
+      imageUrl = 'https://res.cloudinary.com/dfkac2u3x/image/upload/v1761107166/cyberpunk-optimized.jpg';
+    } else if (game.name.toLowerCase().includes('spider')) {
+      imageUrl = 'https://res.cloudinary.com/dfkac2u3x/image/upload/v1761107166/cyberpunk-optimized.jpg';
+    } else if (game.name.toLowerCase().includes('dragon')) {
+      imageUrl = 'https://res.cloudinary.com/dfkac2u3x/image/upload/v1761107166/cyberpunk-optimized.jpg';
+    } else if (game.name.toLowerCase().includes('dark souls')) {
+      imageUrl = 'https://res.cloudinary.com/dfkac2u3x/image/upload/v1761107166/cyberpunk-optimized.jpg';
+    } else if (game.name.toLowerCase().includes('payday')) {
+      imageUrl = 'https://res.cloudinary.com/dfkac2u3x/image/upload/v1761107166/cyberpunk-optimized.jpg';
+    } else if (game.name.toLowerCase().includes('resident')) {
+      imageUrl = 'https://res.cloudinary.com/dfkac2u3x/image/upload/v1761107166/cyberpunk-optimized.jpg';
+    } else if (game.name.toLowerCase().includes('call of duty') || game.name.toLowerCase().includes('cod')) {
+      imageUrl = 'https://res.cloudinary.com/dfkac2u3x/image/upload/v1761107166/cyberpunk-optimized.jpg';
+    } else if (game.name.toLowerCase().includes('farming')) {
+      imageUrl = 'https://res.cloudinary.com/dfkac2u3x/image/upload/v1761107166/stardew-optimized.jpg';
+    } else if (game.name.toLowerCase().includes('truck')) {
+      imageUrl = 'https://res.cloudinary.com/dfkac2u3x/image/upload/v1761107166/cyberpunk-optimized.jpg';
+    } else if (game.name.toLowerCase().includes('car')) {
+      imageUrl = 'https://res.cloudinary.com/dfkac2u3x/image/upload/v1761107166/cyberpunk-optimized.jpg';
+    } else if (game.name.toLowerCase().includes('house')) {
+      imageUrl = 'https://res.cloudinary.com/dfkac2u3x/image/upload/v1761107166/cyberpunk-optimized.jpg';
+    } else if (game.name.toLowerCase().includes('simulator')) {
+      imageUrl = 'https://res.cloudinary.com/dfkac2u3x/image/upload/v1761107166/stardew-optimized.jpg';
+    } else if (game.name.toLowerCase().includes('outlast')) {
+      imageUrl = 'https://res.cloudinary.com/dfkac2u3x/image/upload/v1761107166/cyberpunk-optimized.jpg';
+    } else if (game.name.toLowerCase().includes('phasmophobia')) {
+      imageUrl = 'https://res.cloudinary.com/dfkac2u3x/image/upload/v1761107166/cyberpunk-optimized.jpg';
+    }
+    
+    // Update the game
+    await Game.updateOne(
+      { _id: game._id },
+      { $set: { image: imageUrl } }
     );
-    console.log(`Pattern ${pattern}: ${result.modifiedCount} games updated`);
+    
+    updatedCount++;
+    console.log(`✅ Updated: ${game.name}`);
   }
   
+  console.log(`\n🎮 Total games updated: ${updatedCount}/${allGames.length}`);
   process.exit(0);
 })
 .catch(err => {
