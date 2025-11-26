@@ -689,6 +689,15 @@ app.post("/api/chat", async (req, res) => {
       User: "thủ đô của Việt Nam là gì"
       JSON: { "response": "Rất tiếc, tôi chỉ là trợ lý Gam34Pers và chỉ có thể giúp bạn về game thôi.", "query": {} }
     `;
+    console.log('🤖 Initializing Gemini AI...');
+    if (!process.env.GEMINI_API_KEY) {
+      console.error('❌ GEMINI_API_KEY not found in environment');
+      return res.status(500).json({ text: "AI service not configured properly" });
+    }
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    console.log('🤖 Gemini AI initialized successfully');
+    
     const formattedHistory = history
       .filter((msg) => msg.id !== 1)
       .map((msg) => ({
@@ -715,8 +724,10 @@ app.post("/api/chat", async (req, res) => {
         parts: [{ text: systemPrompt }],
       },
     });
+    console.log('🤖 Sending message to Gemini:', message);
     const result = await chat.sendMessage(message);
     const aiResponseText = result.response.text();
+    console.log('🤖 Gemini raw response:', aiResponseText);
     let aiJson;
     try {
       const cleanedJsonText = aiResponseText
