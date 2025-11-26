@@ -692,7 +692,12 @@ app.post("/api/chat", async (req, res) => {
       .map((msg) => ({
         role: msg.from === "user" ? "user" : "model",
         parts: [{ text: msg.text }],
-      }));
+      }))
+      .filter((msg, index, arr) => {
+        // Ensure first message is from user
+        if (index === 0 && msg.role !== "user") return false;
+        return true;
+      });
     const chat = model.startChat({
       history: formattedHistory,
       systemInstruction: {
