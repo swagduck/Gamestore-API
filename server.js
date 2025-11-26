@@ -694,6 +694,15 @@ app.post("/api/chat", async (req, res) => {
         parts: [{ text: msg.text }],
       }))
       .filter((msg, index, arr) => {
+        // Remove any bot messages that come before user messages
+        if (msg.role !== "user") {
+          // Keep bot messages only if there's a user message before them
+          const hasUserBefore = arr.slice(0, index).some(m => m.role === "user");
+          return hasUserBefore;
+        }
+        return true;
+      })
+      .filter((msg, index, arr) => {
         // Ensure first message is from user
         if (index === 0 && msg.role !== "user") return false;
         return true;
