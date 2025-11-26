@@ -49,8 +49,9 @@ app.use(cors({
   credentials: true
 }));
 console.log(">>> SERVER: CORS middleware applied with specific origins.");
-app.use(express.json());
-console.log(">>> SERVER: JSON middleware applied.");
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+console.log(">>> SERVER: JSON and URL-encoded middleware applied.");
 
 // --- Connect to Database ---
 console.log(">>> SERVER: Attempting DB connection...");
@@ -1733,6 +1734,23 @@ app.post("/api/discounts/validate", async (req, res) => {
 // =========================================================
 
 // --- Start Server ---
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`API Server đang chạy tại http://localhost:${PORT}`);
+});
+
+// Graceful shutdown handling
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, shutting down gracefully');
+  server.close(() => {
+    console.log('Process terminated');
+    mongoose.connection.close();
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT received, shutting down gracefully');
+  server.close(() => {
+    console.log('Process terminated');
+    mongoose.connection.close();
+  });
 });
