@@ -1,4 +1,4 @@
-const express = require("express");
+﻿const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 require("dotenv").config();
@@ -19,7 +19,7 @@ const myCache = new NodeCache({ stdTTL: 300, checkperiod: 120 }); // Cache for 5
 
 // --- Initialize Google AI ---
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-// Use the model name that worked for you (e.g., "gemini-flash-latest")
+// Use the correct model name
 const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
 
 const app = express();
@@ -499,7 +499,7 @@ app.post("/api/chat", async (req, res) => {
   try {
     const { message, history } = req.body;
     const systemPrompt = `
-      Bạn là "Trợ lý AI GameStore", một chatbot bán hàng vui vẻ và hữu ích.
+      Bạn là "Trợ lý AI Gam34Pers", một chatbot bán hàng vui vẻ và hữu ích.
       Nhiệm vụ của bạn là phân tích yêu cầu của người dùng và CHỈ trả lời bằng một đối tượng JSON.
       KHÔNG được trả lời bằng văn bản thông thường.
       
@@ -532,7 +532,7 @@ app.post("/api/chat", async (req, res) => {
 
       Nếu tôi hỏi ngoài chủ đề game, hãy từ chối:
       User: "thủ đô của Việt Nam là gì"
-      JSON: { "response": "Rất tiếc, tôi chỉ là trợ lý GameStore và chỉ có thể giúp bạn về game thôi.", "query": {} }
+      JSON: { "response": "Rất tiếc, tôi chỉ là trợ lý Gam34Pers và chỉ có thể giúp bạn về game thôi.", "query": {} }
     `;
     const formattedHistory = history
       .filter((msg) => msg.id !== 1)
