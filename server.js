@@ -695,7 +695,7 @@ app.post("/api/chat", async (req, res) => {
       return res.status(500).json({ text: "AI service not configured properly" });
     }
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
     console.log('🤖 Gemini AI initialized successfully');
     
     const formattedHistory = history
