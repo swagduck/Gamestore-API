@@ -63,6 +63,39 @@ mongoose
   })
   .catch((err) => console.error("Lỗi kết nối MongoDB:", err));
 
+// --- Rate Limiting for Chat API ---
+const chatRateLimit = new Map(); // Simple in-memory rate limit
+
+const checkRateLimit = (req, res, next) => {
+  const clientIP = req.ip || req.connection.remoteAddress;
+  const now = Date.now();
+  const windowMs = 60000; // 1 minute window
+  const maxRequests = 10; // Max 10 requests per minute per IP
+  
+  if (!chatRateLimit.has(clientIP)) {
+    chatRateLimit.set(clientIP, { count: 1, resetTime: now + windowMs });
+    return next();
+  }
+  
+  const clientData = chatRateLimit.get(clientIP);
+  
+  if (now > clientData.resetTime) {
+    // Reset window
+    chatRateLimit.set(clientIP, { count: 1, resetTime: now + windowMs });
+    return next();
+  }
+  
+  if (clientData.count >= maxRequests) {
+    return res.status(429).json({
+      text: "Bot đang bận, vui lòng thử lại sau 1 phút!",
+      error: "RATE_LIMIT_EXCEEDED"
+    });
+  }
+  
+  clientData.count++;
+  next();
+};
+
 // --- AUTH MIDDLEWARE ---
 const verifyToken = async (req, res, next) => {
   try {
@@ -650,7 +683,7 @@ app.post("/api/stripe/webhook", async (req, res) => {
 });
 
 // == Chatbot Route ==
-app.post("/api/chat", async (req, res) => {
+app.post("/api/chat", checkRateLimit, async (req, res) => {
   try {
     const { message, history } = req.body;
     console.log('🤖 Chat API Request:', { message, historyLength: history?.length });
@@ -765,9 +798,18 @@ app.post("/api/chat", async (req, res) => {
     console.error('❌ Chat API Error:', error);
     console.error('❌ Request body:', req.body);
     console.error('❌ Error stack:', error.stack);
-    res.status(500).json({
-      text: "Rất tiếc, bộ não AI của tôi đang tạm nghỉ. Lỗi: " + error.message,
-    });
+    
+    // Handle specific API limit errors
+    if (error.message.includes('quota') || error.message.includes('limit') || error.status === 429) {
+      res.status(429).json({
+        text: "Bot đang quá tải, vui lòng thử lại sau vài phút!",
+        error: "API_LIMIT_EXCEEDED"
+      });
+    } else {
+      res.status(500).json({
+        text: "Rất tiếc, bộ não AI của tôi đang tạm nghỉ. Lỗi: " + error.message,
+      });
+    }
   }
 });
 
