@@ -651,6 +651,8 @@ app.post("/api/stripe/webhook", async (req, res) => {
 app.post("/api/chat", async (req, res) => {
   try {
     const { message, history } = req.body;
+    console.log('🤖 Chat API Request:', { message, historyLength: history?.length });
+    console.log('🤖 History sample:', history?.slice(0, 2));
     const systemPrompt = `
       Bạn là "Trợ lý AI Gam34Pers", một chatbot bán hàng vui vẻ và hữu ích.
       Nhiệm vụ của bạn là phân tích yêu cầu của người dùng và CHỈ trả lời bằng một đối tượng JSON.
@@ -737,7 +739,9 @@ app.post("/api/chat", async (req, res) => {
       results: gameResults,
     });
   } catch (error) {
-    console.error("Lỗi API Chat:", error);
+    console.error('❌ Chat API Error:', error);
+    console.error('❌ Request body:', req.body);
+    console.error('❌ Error stack:', error.stack);
     res.status(500).json({
       text: "Rất tiếc, bộ não AI của tôi đang tạm nghỉ. Lỗi: " + error.message,
     });
@@ -1067,7 +1071,8 @@ app.post("/api/auth/forgot-password", async (req, res) => {
       resetToken: resetToken,
     });
   } catch (error) {
-    console.error("Lỗi forgot password:", error);
+    console.error('❌ Forgot Password Error:', error);
+    console.error('❌ Request body:', req.body);
     res.status(500).json({ message: "Lỗi máy chủ." });
   }
 });
