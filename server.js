@@ -736,12 +736,11 @@ app.post("/api/chat", async (req, res) => {
       aiJson = JSON.parse(cleanedJsonText);
     } catch (e) {
       console.error("Lỗi parse JSON từ AI:", aiResponseText);
-      console.log("🤖 Using fallback response...");
-      // Fallback response if AI doesn't return valid JSON
+      console.log("🤖 AI returned non-JSON response, using as plain text...");
+      
+      // If AI returns plain text, use it directly as the response
       const fallbackResponse = {
-        response: aiResponseText.includes("sự cố") ? 
-          "Chào bạn! Tôi có thể giúp bạn tìm game hay. Bạn muốn tìm thể loại game nào?" :
-          aiResponseText,
+        response: aiResponseText.trim(),
         query: {}
       };
       return res.json({
