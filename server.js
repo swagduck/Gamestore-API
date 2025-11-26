@@ -8,6 +8,7 @@ const Review = require("./Review.js"); // Review model
 const Analytics = require("./Analytics.js"); // Analytics model for tracking
 const Notification = require("./Notification.js"); // Notification model
 const Discount = require("./Discount.js"); // Discount model
+const Order = require("./Order.js"); // Order model for user purchase history
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const NodeCache = require("node-cache");
@@ -484,14 +485,166 @@ app.post("/api/create-checkout-session", async (req, res) => {
       payment_method_types: ["card"],
       line_items: line_items,
       mode: "payment",
-      success_url: process.env.FRONTEND_URL + "/success", // Your success page URL
+      success_url: process.env.FRONTEND_URL + "/success?session_id={CHECKOUT_SESSION_ID}", // Your success page URL
       cancel_url: process.env.FRONTEND_URL + "/cancel", // Your cancel page URL
+      metadata: {
+        userId: req.user?.id || 'guest' // Include user ID in metadata
+      },
+      client_reference_id: req.user?.id || 'guest' // Alternative way to track user
     });
     res.json({ url: session.url }); // Return the checkout session URL
   } catch (error) {
     console.error("Lỗi khi tạo phiên Stripe:", error);
     res.status(500).json({ message: "Không thể tạo phiên thanh toán" });
   }
+});
+
+// == Order Creation from Frontend Success Page ==
+app.post("/api/orders/create-from-session", verifyToken, async (req, res) => {
+  try {
+    const { sessionId, cartItems } = req.body;
+    const userId = req.user._id;
+    
+    if (!sessionId || !cartItems || !Array.isArray(cartItems)) {
+      return res.status(400).json({ message: "Session ID và cart items là bắt buộc" });
+    }
+    
+    // Verify the Stripe session
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    
+    if (!session || session.payment_status !== 'paid') {
+      return res.status(400).json({ message: "Session không hợp lệ hoặc thanh toán chưa hoàn thành" });
+    }
+    
+    // Check if order already exists for this session
+    const existingOrder = await Order.findOne({ paymentId: sessionId });
+    if (existingOrder) {
+      return res.json(existingOrder); // Return existing order
+    }
+    
+    // Calculate total and prepare order items
+    let totalAmount = 0;
+    const orderItems = cartItems.map(item => {
+      let finalPrice = item.price;
+      
+      // Apply discount if active
+      if (item.discountType && item.discountType !== 'none') {
+        const now = new Date();
+        const start = item.discountStartDate ? new Date(item.discountStartDate) : null;
+        const end = item.discountEndDate ? new Date(item.discountEndDate) : null;
+        const isDiscountActive = (!start || now >= start) && (!end || now <= end);
+        
+        if (isDiscountActive) {
+          if (item.discountType === 'percentage') {
+            finalPrice = item.price * (1 - item.discountValue / 100);
+          } else if (item.discountType === 'fixed') {
+            finalPrice = Math.max(0, item.price - item.discountValue);
+          }
+        }
+      }
+      
+      totalAmount += finalPrice * item.quantity;
+      
+      return {
+        game: item._id,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        image: item.image,
+        discountType: item.discountType || 'none',
+        discountValue: item.discountValue || 0,
+        finalPrice: finalPrice
+      };
+    });
+    
+    // Create order
+    const order = new Order({
+      user: userId,
+      items: orderItems,
+      totalAmount,
+      paymentMethod: 'stripe',
+      paymentId: sessionId,
+      status: 'completed'
+    });
+    
+    await order.save();
+    
+    // Populate game details for response
+    await order.populate('items.game', 'name genre image rating');
+    
+    console.log(`✅ Order created from frontend: ${order._id} for user ${userId}`);
+    
+    res.status(201).json(order);
+  } catch (error) {
+    console.error("Lỗi khi tạo đơn hàng từ session:", error);
+    res.status(500).json({ message: "Lỗi máy chủ khi tạo đơn hàng" });
+  }
+});
+
+// == Stripe Webhook for Payment Completion ==
+app.post("/api/stripe/webhook", async (req, res) => {
+  const sig = req.headers["stripe-signature"];
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+  } catch (err) {
+    console.log(`Webhook signature verification failed.`, err.message);
+    return res.status(400).send(`Webhook signature verification failed.`);
+  }
+
+  // Handle the event
+  switch (event.type) {
+    case "checkout.session.completed":
+      const session = event.data.object;
+      
+      try {
+        // Create order from completed session
+        const orderData = {
+          items: session.display_items || [],
+          totalAmount: session.amount_total / 100, // Convert from cents
+          paymentMethod: "stripe",
+          paymentId: session.id,
+          status: "completed"
+        };
+
+        // Get user from session metadata or create guest order
+        const userId = session.metadata?.userId;
+        if (userId) {
+          orderData.user = userId;
+          
+          const order = new Order(orderData);
+          await order.save();
+          
+          console.log(`✅ Order created for user ${userId}: ${order._id}`);
+        }
+      } catch (error) {
+        console.error("Error creating order from webhook:", error);
+      }
+      break;
+
+    case "checkout.session.expired":
+    case "checkout.session.async_payment_failed":
+      const failedSession = event.data.object;
+      console.log(`❌ Payment failed for session: ${failedSession.id}`);
+      
+      // Update order status to failed if it exists
+      try {
+        await Order.findOneAndUpdate(
+          { paymentId: failedSession.id },
+          { status: "failed", updatedAt: new Date() }
+        );
+      } catch (error) {
+        console.error("Error updating failed order:", error);
+      }
+      break;
+
+    default:
+      console.log(`Unhandled event type ${event.type}`);
+  }
+
+  // Return a 200 response to acknowledge receipt of the event
+  res.send();
 });
 
 // == Chatbot Route ==
@@ -575,6 +728,187 @@ app.post("/api/chat", async (req, res) => {
     res.status(500).json({
       text: "Rất tiếc, bộ não AI của tôi đang tạm nghỉ. Lỗi: " + error.message,
     });
+  }
+});
+
+// == Order Routes ==
+
+// GET user's order history (authenticated users only)
+app.get("/api/orders", verifyToken, async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { page = 1, limit = 10, status } = req.query;
+    
+    // Build query
+    const query = { user: userId };
+    if (status && status !== 'all') {
+      query.status = status;
+    }
+    
+    // Pagination
+    const skip = (page - 1) * limit;
+    
+    const orders = await Order.find(query)
+      .populate('items.game', 'name genre image rating')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+    
+    const total = await Order.countDocuments(query);
+    
+    res.json({
+      orders,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / limit)
+      }
+    });
+  } catch (error) {
+    console.error("Lỗi khi lấy lịch sử đơn hàng:", error);
+    res.status(500).json({ message: "Lỗi máy chủ khi lấy lịch sử đơn hàng" });
+  }
+});
+
+// GET single order details
+app.get("/api/orders/:id", verifyToken, async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const orderId = req.params.id;
+    
+    const order = await Order.findOne({ _id: orderId, user: userId })
+      .populate('items.game', 'name genre image rating description platform');
+    
+    if (!order) {
+      return res.status(404).json({ message: "Không tìm thấy đơn hàng" });
+    }
+    
+    res.json(order);
+  } catch (error) {
+    console.error("Lỗi khi lấy chi tiết đơn hàng:", error);
+    res.status(500).json({ message: "Lỗi máy chủ khi lấy chi tiết đơn hàng" });
+  }
+});
+
+// POST create new order (used by payment success)
+app.post("/api/orders", verifyToken, async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { items, totalAmount, paymentMethod, paymentId, status = 'pending' } = req.body;
+    
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ message: "Giỏ hàng trống" });
+    }
+    
+    // Validate items
+    for (const item of items) {
+      if (!item.game || !item.name || !item.price || !item.quantity) {
+        return res.status(400).json({ message: "Thông tin sản phẩm không hợp lệ" });
+      }
+    }
+    
+    const order = new Order({
+      user: userId,
+      items,
+      totalAmount,
+      paymentMethod,
+      paymentId,
+      status
+    });
+    
+    await order.save();
+    
+    // Populate game details for response
+    await order.populate('items.game', 'name genre image rating');
+    
+    // Update analytics
+    await Analytics.findOneAndUpdate(
+      {},
+      {
+        $push: {
+          orders: {
+            userId,
+            items: items.map(item => ({
+              gameId: item.game,
+              name: item.name,
+              quantity: item.quantity,
+              price: item.finalPrice || item.price
+            })),
+            total: totalAmount,
+            createdAt: new Date()
+          }
+        }
+      },
+      { upsert: true }
+    );
+    
+    res.status(201).json(order);
+  } catch (error) {
+    console.error("Lỗi khi tạo đơn hàng:", error);
+    res.status(500).json({ message: "Lỗi máy chủ khi tạo đơn hàng" });
+  }
+});
+
+// PUT update order status (for payment completion/failure)
+app.put("/api/orders/:id/status", async (req, res) => {
+  try {
+    const { status } = req.body;
+    const orderId = req.params.id;
+    
+    if (!['pending', 'completed', 'failed', 'refunded'].includes(status)) {
+      return res.status(400).json({ message: "Trạng thái không hợp lệ" });
+    }
+    
+    const order = await Order.findByIdAndUpdate(
+      orderId,
+      { status, updatedAt: new Date() },
+      { new: true }
+    ).populate('items.game', 'name genre image rating');
+    
+    if (!order) {
+      return res.status(404).json({ message: "Không tìm thấy đơn hàng" });
+    }
+    
+    res.json(order);
+  } catch (error) {
+    console.error("Lỗi khi cập nhật trạng thái đơn hàng:", error);
+    res.status(500).json({ message: "Lỗi máy chủ khi cập nhật trạng thái đơn hàng" });
+  }
+});
+
+// GET user's purchased games for recommendations
+app.get("/api/orders/purchased-games", verifyToken, async (req, res) => {
+  try {
+    const userId = req.user._id;
+    
+    // Get all completed orders
+    const orders = await Order.find({ 
+      user: userId, 
+      status: 'completed' 
+    }).populate('items.game', 'name genre image rating platform');
+    
+    // Extract unique games
+    const purchasedGames = [];
+    const gameIds = new Set();
+    
+    orders.forEach(order => {
+      order.items.forEach(item => {
+        if (item.game && !gameIds.has(item.game._id.toString())) {
+          gameIds.add(item.game._id.toString());
+          purchasedGames.push({
+            ...item.game.toObject(),
+            purchasedAt: order.createdAt,
+            price: item.finalPrice || item.price
+          });
+        }
+      });
+    });
+    
+    res.json(purchasedGames);
+  } catch (error) {
+    console.error("Lỗi khi lấy game đã mua:", error);
+    res.status(500).json({ message: "Lỗi máy chủ khi lấy game đã mua" });
   }
 });
 
