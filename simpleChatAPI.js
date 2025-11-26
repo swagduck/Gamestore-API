@@ -1,6 +1,7 @@
 // Simple Chat API - Clean and reliable
 const express = require("express");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
+const Game = require("./Game.js");
 
 const router = express.Router();
 
@@ -39,6 +40,43 @@ const checkRateLimit = (req, res, next) => {
   next();
 };
 
+// Search games function
+const searchGames = async (query) => {
+  try {
+    let searchQuery = {};
+    
+    // Extract game type from message
+    if (query.toLowerCase().includes('hành động')) {
+      searchQuery.genre = 'Hành động';
+    } else if (query.toLowerCase().includes('nhập vai')) {
+      searchQuery.genre = 'Nhập vai';
+    } else if (query.toLowerCase().includes('phiêu lưu')) {
+      searchQuery.genre = 'Phiêu lưu';
+    } else if (query.toLowerCase().includes('mô phỏng')) {
+      searchQuery.genre = 'Mô phỏng';
+    } else if (query.toLowerCase().includes('chiến thuật')) {
+      searchQuery.genre = 'Chiến thuật';
+    } else if (query.toLowerCase().includes('kinh dị')) {
+      searchQuery.genre = 'Kinh dị';
+    } else if (query.toLowerCase().includes('thể thao')) {
+      searchQuery.genre = 'Thể thao';
+    } else if (query.toLowerCase().includes('đua xe')) {
+      searchQuery.genre = 'Đua xe';
+    } else if (query.toLowerCase().includes('miễn phí')) {
+      searchQuery.price = 0;
+    } else if (query.toLowerCase().includes('giá rẻ') || query.toLowerCase().includes('rẻ')) {
+      searchQuery.price = { $lte: 20 };
+    }
+    
+    // Search in database
+    const games = await Game.find(searchQuery).limit(5);
+    return games;
+  } catch (error) {
+    console.error('Search games error:', error);
+    return [];
+  }
+};
+
 // Chat endpoint
 router.post("/chat", checkRateLimit, async (req, res) => {
   try {
@@ -53,49 +91,59 @@ router.post("/chat", checkRateLimit, async (req, res) => {
 
     console.log('🤖 Chat Request:', message);
 
-    // Simple prompt for Gemini
-    const prompt = `Bạn là trợ lý game Gam34Pers. Trả lời ngắn gọn, thân thiện về game.
+    // First, try to search for games
+    const gameResults = await searchGames(message);
+    
+    let responseText = '';
+    
+    if (gameResults.length > 0) {
+      // Found games, create response with game suggestions
+      const gameList = gameResults.map(game => 
+        `🎮 **${game.name}**\n   📝 ${game.description?.substring(0, 100) || 'Game hay'}...\n   💰 $${game.price}\n   ⭐ ${game.rating || '4.5'}/5`
+      ).join('\n\n');
+      
+      responseText = `Tôi tìm thấy ${gameResults.length} game hay cho bạn:\n\n${gameList}\n\n🎯 Bạn muốn biết thêm về game nào không?`;
+    } else {
+      // No games found, use Gemini AI
+      const prompt = `Bạn là trợ lý game Gam34Pers. Trả lời ngắn gọn, thân thiện về game.
 
 User: ${message}
 Answer:`;
 
-    try {
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text();
+      try {
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        responseText = response.text();
+        console.log('✅ Gemini Response:', responseText);
+      } catch (geminiError) {
+        console.error('❌ Gemini Error:', geminiError);
+        
+        // Check if it's a quota/rate limit error
+        if (geminiError.message.includes('quota') || 
+            geminiError.message.includes('limit') || 
+            geminiError.status === 429) {
+          return res.status(429).json({
+            text: "Bot đang quá tải, vui lòng thử lại sau vài phút!",
+            error: "QUOTA_EXCEEDED"
+          });
+        }
 
-      console.log('✅ Gemini Response:', text);
+        // Fallback response
+        const fallbackResponses = [
+          "Xin lỗi, tôi đang gặp sự cố kỹ thuật. Bạn có thể thử lại không?",
+          "Tôi không thể kết nối đến AI ngay bây giờ. Bạn có thể hỏi tôi về game cụ thể không?",
+          "Có lỗi xảy ra. Bạn muốn tìm game theo thể loại nào?"
+        ];
 
-      res.json({
-        text: text.trim(),
-        success: true
-      });
-
-    } catch (geminiError) {
-      console.error('❌ Gemini Error:', geminiError);
-      
-      // Check if it's a quota/rate limit error
-      if (geminiError.message.includes('quota') || 
-          geminiError.message.includes('limit') || 
-          geminiError.status === 429) {
-        return res.status(429).json({
-          text: "Bot đang quá tải, vui lòng thử lại sau vài phút!",
-          error: "QUOTA_EXCEEDED"
-        });
+        responseText = fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
       }
-
-      // Fallback response
-      const fallbackResponses = [
-        "Xin lỗi, tôi đang gặp sự cố kỹ thuật. Bạn có thể thử lại không?",
-        "Tôi không thể kết nối đến AI ngay bây giờ. Bạn có thể hỏi tôi về game cụ thể không?",
-        "Có lỗi xảy ra. Bạn muốn tìm game theo thể loại nào?"
-      ];
-
-      res.json({
-        text: fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)],
-        success: false
-      });
     }
+
+    res.json({
+      text: responseText.trim(),
+      results: gameResults,
+      success: true
+    });
 
   } catch (error) {
     console.error('❌ Chat API Error:', error);
