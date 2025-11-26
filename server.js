@@ -695,7 +695,7 @@ app.post("/api/chat", async (req, res) => {
       return res.status(500).json({ text: "AI service not configured properly" });
     }
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
     console.log('🤖 Gemini AI initialized successfully');
     
     const formattedHistory = history
@@ -736,7 +736,18 @@ app.post("/api/chat", async (req, res) => {
       aiJson = JSON.parse(cleanedJsonText);
     } catch (e) {
       console.error("Lỗi parse JSON từ AI:", aiResponseText);
-      return res.status(500).json({ text: "AI trả về lỗi, vui lòng thử lại." });
+      console.log("🤖 Using fallback response...");
+      // Fallback response if AI doesn't return valid JSON
+      const fallbackResponse = {
+        response: aiResponseText.includes("sự cố") ? 
+          "Chào bạn! Tôi có thể giúp bạn tìm game hay. Bạn muốn tìm thể loại game nào?" :
+          aiResponseText,
+        query: {}
+      };
+      return res.json({
+        text: fallbackResponse.response,
+        results: [],
+      });
     }
     let gameResults = [];
     if (
