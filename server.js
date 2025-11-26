@@ -688,7 +688,8 @@ app.post("/api/stripe/webhook", async (req, res) => {
 });
 
 // == Chatbot Route (OLD - DISABLED) ==
-// app.post("/api/chat", checkRateLimit, async (req, res) => {
+/*
+app.post("/api/chat", checkRateLimit, async (req, res) => {
   try {
     const { message, history } = req.body;
     console.log('🤖 Chat API Request:', { message, historyLength: history?.length });
@@ -858,6 +859,7 @@ app.post("/api/stripe/webhook", async (req, res) => {
     }
   }
 });
+*/
 
 // == Order Routes ==
 
