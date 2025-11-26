@@ -14,6 +14,7 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 const NodeCache = require("node-cache");
 const bcrypt = require("bcryptjs"); // For password hashing
 const jwt = require("jsonwebtoken"); // For authentication tokens
+const simpleChatRouter = require("./simpleChatAPI"); // New simple chat API
 
 // --- Initialize Cache ---
 const myCache = new NodeCache({ stdTTL: 300, checkperiod: 120 }); // Cache for 5 minutes
@@ -53,6 +54,10 @@ console.log(">>> SERVER: CORS middleware applied with specific origins.");
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 console.log(">>> SERVER: JSON and URL-encoded middleware applied.");
+
+// Use simple chat API
+app.use("/api", simpleChatRouter);
+console.log(">>> SERVER: Simple Chat API loaded");
 
 // --- Connect to Database ---
 console.log(">>> SERVER: Attempting DB connection...");
@@ -682,8 +687,8 @@ app.post("/api/stripe/webhook", async (req, res) => {
   res.send();
 });
 
-// == Chatbot Route ==
-app.post("/api/chat", checkRateLimit, async (req, res) => {
+// == Chatbot Route (OLD - DISABLED) ==
+// app.post("/api/chat", checkRateLimit, async (req, res) => {
   try {
     const { message, history } = req.body;
     console.log('🤖 Chat API Request:', { message, historyLength: history?.length });
@@ -697,32 +702,73 @@ app.post("/api/chat", checkRateLimit, async (req, res) => {
       Các nền tảng (platform) bạn biết: PC, PlayStation 5, Xbox Series X, Nintendo Switch, PS4, Xbox One.
 
       *** HƯỚNG DẪN MỚI: ***
-      - Nếu người dùng hỏi về MỘT TÊN GAME CỤ THỂ (ví dụ: "có Cyberpunk không?", "Elden Ring", "tìm God of War"), HÃY ƯU TIÊN tìm chính xác game đó. Trả về JSON với query CHỈ chứa tên game đó (dùng regex để tìm không phân biệt hoa thường).
-        Ví dụ User: "có cyberpunk 2077 không?" -> JSON: { "response": "Có ngay Cyberpunk 2077 cho bạn:", "query": { "name": { "$regex": "Cyberpunk 2077", "$options": "i" } } }
-      - Nếu người dùng chỉ hỏi THỂ LOẠI hoặc NỀN TẢNG (ví dụ: "game nhập vai", "game cho PC"), HÃY tìm theo các tiêu chí đó như bình thường.
-      - LUÔN LUÔN cố gắng trả về một đối tượng "query" nếu bạn nghĩ người dùng muốn tìm game. Nếu không chắc, trả về query rỗng {}.
-      - Ưu tiên sử dụng thông tin từ LỊCH SỬ (history) để hiểu ngữ cảnh của câu hỏi hiện tại.
-      *** KẾT THÚC HƯỚNG DẪN MỚI ***
+      1. KHI NGƯỜI DÙNG HỎI VỀ GAME THEO THỂ LOẠI:
+         - Trả lời JSON với "response" và "query" 
+         - "query" chứa { genre: "tên_thể_loại" }
+         - "response" là câu trả lời thân thiện
 
-      Ví dụ:
-      User: "Xin chào"
-      JSON: { "response": "Xin chào! Tôi có thể giúp bạn tìm game không?", "query": {} }
+      2. KHI NGƯỜI DÙNG HỎI VỀ GAME THEO NỀN TẢNG:
+         - Trả lời JSON với "response" và "query"
+         - "query" chứa { platform: "tên_nền_tảng" }
+         - "response" là câu trả lời thân thiện
 
-      User: "Tìm cho tôi vài game nhập vai"
-      JSON: { "response": "OK, tôi đã tìm thấy một số game 'Nhập vai' cho bạn:", "query": { "genre": "Nhập vai" } }
-      
-      User: "có elden ring không?" // Hướng dẫn mới
-      JSON: { "response": "Chắc chắn rồi, Elden Ring đây:", "query": { "name": { "$regex": "Elden Ring", "$options": "i" } } }
+      3. KHI NGƯỜI DÙNG HỎI VỀ GAME THEO TÊN:
+         - Trả lời JSON với "response" và "query"
+         - "query" chứa { name: "tên_game" }
+         - "response" là câu trả lời thân thiện
 
-      User: "game hành động trên PC"
-      JSON: { "response": "Tuyệt! Dưới đây là các game 'Hành động' cho 'PC':", "query": { "genre": "Hành động", "platform": "PC" } }
-      
-      User: "Cảm ơn"
-      JSON: { "response": "Không có gì! Chúc bạn chơi game vui vẻ!", "query": {} }
+      4. KHI NGƯỜI DÙNG HỎI CHUNG CHUNG:
+         - Trả lời JSON với "response" và "query": {}
+         - "response" là câu trả lời thân thiện
 
-      Nếu tôi hỏi ngoài chủ đề game, hãy từ chối:
-      User: "thủ đô của Việt Nam là gì"
-      JSON: { "response": "Rất tiếc, tôi chỉ là trợ lý Gam34Pers và chỉ có thể giúp bạn về game thôi.", "query": {} }
+      5. KHI NGƯỜI DÙNG CHÀO HỎI:
+         - Trả lời JSON với "response" là lời chào và "query": {}
+
+      6. KHI NGƯỜI DÙNG CẢM ƠN:
+         - Trả lời JSON với "response" là lời cảm ơn và "query": {}
+
+      7. KHI NGƯỜI DÙNG TẠM BIỆT:
+         - Trả lời JSON với "response" là lời tạm biệt và "query": {}
+
+      8. KHI NGƯỜI DÙNG HỎI VỀ GIÁ:
+         - Trả lời JSON với "response" là thông tin về giá và "query": {}
+
+      9. KHI NGƯỜI DÙNG HỎI VỀ KHUYẾN MÃI:
+         - Trả lời JSON với "response" là thông tin về khuyến mãi và "query": {}
+
+      10. KHI NGƯỜI DÙNG HỎI VỀ ĐÁNH GIÁ:
+          - Trả lời JSON với "response" là thông tin về đánh giá và "query": {}
+
+      *** VÍ DỤ: ***
+      User: "Cho tôi game nhập vai hay"
+      Response: {
+        "response": "Tôi gợi ý một số game nhập vai hay cho bạn!",
+        "query": { "genre": "Nhập vai" }
+      }
+
+      User: "Game cho PS5"
+      Response: {
+        "response": "Tôi tìm game PlayStation 5 cho bạn!",
+        "query": { "platform": "PlayStation 5" }
+      }
+
+      User: "Chào bạn"
+      Response: {
+        "response": "Xin chào! Tôi có thể giúp gì cho bạn?",
+        "query": {}
+      }
+
+      User: "Cảm ơn bạn"
+      Response: {
+        "response": "Rất vui vì đã giúp được bạn!",
+        "query": {}
+      }
+
+      *** QUAN TRỌNG: ***
+      - LUÔN trả về JSON hợp lệ
+      - KHÔNG trả lời bằng văn bản thuần túy
+      - "response" phải thân thiện, hữu ích
+      - "query" chỉ điền khi cần tìm game
     `;
     console.log('🤖 Initializing Gemini AI...');
     if (!process.env.GEMINI_API_KEY) {
