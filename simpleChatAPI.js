@@ -44,28 +44,66 @@ const checkRateLimit = (req, res, next) => {
 const searchGames = async (query) => {
   try {
     let searchQuery = {};
+    let shouldSearch = false;
+    
+    // Only search if message contains game-related keywords
+    const gameKeywords = [
+      'hành động', 'nhập vai', 'phiêu lưu', 'mô phỏng', 'chiến thuật', 
+      'kinh dị', 'thể thao', 'đua xe', 'miễn phí', 'giá rẻ', 'rẻ',
+      'game', 'trò chơi', 'chơi', 'tìm', 'gợi ý', 'hay'
+    ];
+    
+    const hasGameKeyword = gameKeywords.some(keyword => 
+      query.toLowerCase().includes(keyword)
+    );
+    
+    // Don't search for greetings or simple messages
+    const greetings = ['chào', 'hello', 'xin chào', 'hi', 'hey'];
+    const isGreeting = greetings.some(greeting => 
+      query.toLowerCase().includes(greeting)
+    );
+    
+    if (!hasGameKeyword || isGreeting) {
+      return []; // Don't search for greetings or non-game messages
+    }
     
     // Extract game type from message
     if (query.toLowerCase().includes('hành động')) {
       searchQuery.genre = 'Hành động';
+      shouldSearch = true;
     } else if (query.toLowerCase().includes('nhập vai')) {
       searchQuery.genre = 'Nhập vai';
+      shouldSearch = true;
     } else if (query.toLowerCase().includes('phiêu lưu')) {
       searchQuery.genre = 'Phiêu lưu';
+      shouldSearch = true;
     } else if (query.toLowerCase().includes('mô phỏng')) {
       searchQuery.genre = 'Mô phỏng';
+      shouldSearch = true;
     } else if (query.toLowerCase().includes('chiến thuật')) {
       searchQuery.genre = 'Chiến thuật';
+      shouldSearch = true;
     } else if (query.toLowerCase().includes('kinh dị')) {
       searchQuery.genre = 'Kinh dị';
+      shouldSearch = true;
     } else if (query.toLowerCase().includes('thể thao')) {
       searchQuery.genre = 'Thể thao';
+      shouldSearch = true;
     } else if (query.toLowerCase().includes('đua xe')) {
       searchQuery.genre = 'Đua xe';
+      shouldSearch = true;
     } else if (query.toLowerCase().includes('miễn phí')) {
       searchQuery.price = 0;
+      shouldSearch = true;
     } else if (query.toLowerCase().includes('giá rẻ') || query.toLowerCase().includes('rẻ')) {
       searchQuery.price = { $lte: 20 };
+      shouldSearch = true;
+    } else if (query.toLowerCase().includes('game') || query.toLowerCase().includes('trò chơi')) {
+      shouldSearch = true; // General game search
+    }
+    
+    if (!shouldSearch) {
+      return [];
     }
     
     // Search in database
