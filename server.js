@@ -771,6 +771,41 @@ app.get("/api/orders", verifyToken, async (req, res) => {
   }
 });
 
+// GET user's purchased games for recommendations
+app.get("/api/orders/purchased-games", verifyToken, async (req, res) => {
+  try {
+    const userId = req.user._id;
+    
+    // Get all completed orders
+    const orders = await Order.find({ 
+      user: userId, 
+      status: 'completed' 
+    }).populate('items.game', 'name genre image rating platform');
+    
+    // Extract unique games
+    const purchasedGames = [];
+    const gameIds = new Set();
+    
+    orders.forEach(order => {
+      order.items.forEach(item => {
+        if (item.game && !gameIds.has(item.game._id.toString())) {
+          gameIds.add(item.game._id.toString());
+          purchasedGames.push({
+            ...item.game.toObject(),
+            purchasedAt: order.createdAt,
+            price: item.finalPrice || item.price
+          });
+        }
+      });
+    });
+    
+    res.json(purchasedGames);
+  } catch (error) {
+    console.error("Lỗi khi lấy game đã mua:", error);
+    res.status(500).json({ message: "Lỗi máy chủ khi lấy game đã mua" });
+  }
+});
+
 // GET single order details
 app.get("/api/orders/:id", verifyToken, async (req, res) => {
   try {
@@ -874,41 +909,6 @@ app.put("/api/orders/:id/status", async (req, res) => {
   } catch (error) {
     console.error("Lỗi khi cập nhật trạng thái đơn hàng:", error);
     res.status(500).json({ message: "Lỗi máy chủ khi cập nhật trạng thái đơn hàng" });
-  }
-});
-
-// GET user's purchased games for recommendations
-app.get("/api/orders/purchased-games", verifyToken, async (req, res) => {
-  try {
-    const userId = req.user._id;
-    
-    // Get all completed orders
-    const orders = await Order.find({ 
-      user: userId, 
-      status: 'completed' 
-    }).populate('items.game', 'name genre image rating platform');
-    
-    // Extract unique games
-    const purchasedGames = [];
-    const gameIds = new Set();
-    
-    orders.forEach(order => {
-      order.items.forEach(item => {
-        if (item.game && !gameIds.has(item.game._id.toString())) {
-          gameIds.add(item.game._id.toString());
-          purchasedGames.push({
-            ...item.game.toObject(),
-            purchasedAt: order.createdAt,
-            price: item.finalPrice || item.price
-          });
-        }
-      });
-    });
-    
-    res.json(purchasedGames);
-  } catch (error) {
-    console.error("Lỗi khi lấy game đã mua:", error);
-    res.status(500).json({ message: "Lỗi máy chủ khi lấy game đã mua" });
   }
 });
 
