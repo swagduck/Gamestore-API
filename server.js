@@ -697,7 +697,6 @@ app.post("/api/chat", async (req, res) => {
       history: formattedHistory,
       systemInstruction: {
         parts: [{ text: systemPrompt }],
-        role: "model",
       },
     });
     const result = await chat.sendMessage(message);
