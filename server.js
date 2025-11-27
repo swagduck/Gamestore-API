@@ -689,26 +689,23 @@ app.post("/api/chat", checkRateLimit, async (req, res) => {
     const { message, history } = req.body;
     console.log('🤖 Chat API Request:', { message, historyLength: history?.length });
     console.log('🤖 History sample:', history?.slice(0, 2));
-    const systemPrompt = `Bạn là chatbot game. CHỈ TRẢ LỜI BẰNG JSON. Đừng trả lời văn bản.
+    const systemPrompt = `JSON ONLY. NO TEXT.
 
-CÁCH TRẢ LỜI:
-- Game KINH DỊ: {"response": "Tôi tìm game kinh dị cho bạn!", "query": {"genre": "Kinh dị"}}
-- Game HÀNH ĐỘNG: {"response": "Tôi tìm game hành động cho bạn!", "query": {"genre": "Hành động"}}
-- Game NHẬP VAI: {"response": "Tôi tìm game nhập vai cho bạn!", "query": {"genre": "Nhập vai"}}
-- Game PHIÊU LƯU: {"response": "Tôi tìm game phiêu lưu cho bạn!", "query": {"genre": "Phiêu lưu"}}
-- Game MÔ PHỎNG: {"response": "Tôi tìm game mô phỏng cho bạn!", "query": {"genre": "Mô phỏng"}}
-- Game CHIẾN THUẬT: {"response": "Tôi tìm game chiến thuật cho bạn!", "query": {"genre": "Chiến thuật"}}
-- Game THỂ THAO: {"response": "Tôi tìm game thể thao cho bạn!", "query": {"genre": "Thể thao"}}
-- Game ĐUA XE: {"response": "Tôi tìm game đua xe cho bạn!", "query": {"genre": "Đua xe"}}
-- Game PC: {"response": "Tôi tìm game PC cho bạn!", "query": {"platform": "PC"}}
-- Game PS5: {"response": "Tôi tìm game PS5 cho bạn!", "query": {"platform": "PlayStation 5"}}
-- Game Xbox: {"response": "Tôi tìm game Xbox cho bạn!", "query": {"platform": "Xbox Series X"}}
-- Game Switch: {"response": "Tôi tìm game Switch cho bạn!", "query": {"platform": "Nintendo Switch"}}
-- Chào hỏi: {"response": "Xin chào! Tôi có thể giúp gì?", "query": {}}
-- Cảm ơn: {"response": "Rất vui giúp bạn!", "query": {}}
-- Khác: {"response": "Tôi có thể giúp gì?", "query": {}}
-
-QUAN TRỌNG: LUÔN TRẢ VỀ JSON HỢP LỆ, KHÔNG VĂN BẢN.`;
+User asks for horror game: {"response":"Tìm game kinh dị","query":{"genre":"Kinh dị"}}
+User asks for action game: {"response":"Tìm game hành động","query":{"genre":"Hành động"}}
+User asks for RPG game: {"response":"Tìm game nhập vai","query":{"genre":"Nhập vai"}}
+User asks for adventure game: {"response":"Tìm game phiêu lưu","query":{"genre":"Phiêu lưu"}}
+User asks for simulation game: {"response":"Tìm game mô phỏng","query":{"genre":"Mô phỏng"}}
+User asks for strategy game: {"response":"Tìm game chiến thuật","query":{"genre":"Chiến thuật"}}
+User asks for sports game: {"response":"Tìm game thể thao","query":{"genre":"Thể thao"}}
+User asks for racing game: {"response":"Tìm game đua xe","query":{"genre":"Đua xe"}}
+User asks for PC games: {"response":"Tìm game PC","query":{"platform":"PC"}}
+User asks for PS5 games: {"response":"Tìm game PS5","query":{"platform":"PlayStation 5"}}
+User asks for Xbox games: {"response":"Tìm game Xbox","query":{"platform":"Xbox Series X"}}
+User asks for Switch games: {"response":"Tìm game Switch","query":{"platform":"Nintendo Switch"}}
+User says hello: {"response":"Xin chào","query":{}}
+User says thanks: {"response":"Rất vui giúp bạn","query":{}}
+Other: {"response":"Tôi có thể giúp gì","query":{}}`;
     console.log('🤖 Initializing Gemini AI...');
     if (!process.env.GEMINI_API_KEY) {
       console.error('❌ GEMINI_API_KEY not found in environment');
