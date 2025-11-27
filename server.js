@@ -412,9 +412,10 @@ app.post("/api/recommendations", async (req, res) => {
 });
 
 // Test endpoint for payment (without Stripe)
-app.post("/api/test-payment", async (req, res) => {
+app.post("/api/test-payment", verifyToken, async (req, res) => {
   try {
     const { cartItems } = req.body;
+    const userId = req.user._id;
     console.log('Test payment received:', cartItems);
     
     const processedItems = cartItems.map((item) => {
@@ -446,10 +447,63 @@ app.post("/api/test-payment", async (req, res) => {
     
     const total = processedItems.reduce((sum, item) => sum + item.discountedPrice * item.quantity, 0);
     
+    // Generate test session ID
+    const testSessionId = `test_session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Create order for test payment
+    try {
+      const orderItems = cartItems.map(item => {
+        let finalPrice = item.price;
+        
+        if (item.discountType && item.discountType !== 'none') {
+          const now = new Date();
+          const start = item.discountStartDate ? new Date(item.discountStartDate) : null;
+          const end = item.discountEndDate ? new Date(item.discountEndDate) : null;
+          const isDiscountActive = (!start || now >= start) && (!end || now <= end);
+          
+          if (isDiscountActive) {
+            if (item.discountType === 'percentage') {
+              finalPrice = item.price * (1 - item.discountValue / 100);
+            } else if (item.discountType === 'fixed') {
+              finalPrice = Math.max(0, item.price - item.discountValue);
+            }
+          }
+        }
+        
+        return {
+          game: item._id,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+          image: item.image,
+          discountType: item.discountType || 'none',
+          discountValue: item.discountValue || 0,
+          finalPrice: finalPrice
+        };
+      });
+      
+      const order = new Order({
+        user: userId,
+        items: orderItems,
+        totalAmount: total,
+        paymentMethod: 'test',
+        paymentId: testSessionId,
+        status: 'completed'
+      });
+      
+      await order.save();
+      console.log(`✅ Test order created: ${order._id} for user ${userId}`);
+      
+    } catch (orderError) {
+      console.error('Error creating test order:', orderError);
+      // Continue with payment response even if order creation fails
+    }
+    
     res.json({
       success: true,
       items: processedItems,
       totalAmount: total,
+      sessionId: testSessionId, // Add session ID for frontend
       message: "Test payment successful"
     });
   } catch (error) {
@@ -459,7 +513,7 @@ app.post("/api/test-payment", async (req, res) => {
 });
 
 // == Stripe Checkout Route ==
-app.post("/api/create-checkout-session", async (req, res) => {
+app.post("/api/create-checkout-session", verifyToken, async (req, res) => {
   try {
     const { cartItems } = req.body;
     const line_items = cartItems.map((item) => {
@@ -524,9 +578,9 @@ app.post("/api/create-checkout-session", async (req, res) => {
       success_url: process.env.FRONTEND_URL + "/success?session_id={CHECKOUT_SESSION_ID}", // Your success page URL
       cancel_url: process.env.FRONTEND_URL + "/cancel", // Your cancel page URL
       metadata: {
-        userId: req.user?.id || 'guest' // Include user ID in metadata
+        userId: req.user?._id?.toString() || 'guest' // Include user ID in metadata
       },
-      client_reference_id: req.user?.id || 'guest' // Alternative way to track user
+      client_reference_id: req.user?._id?.toString() || 'guest' // Alternative way to track user
     });
     res.json({ url: session.url }); // Return the checkout session URL
   } catch (error) {
@@ -563,6 +617,11 @@ app.post("/api/orders/create-from-session", verifyToken, async (req, res) => {
     const orderItems = cartItems.map(item => {
       let finalPrice = item.price;
       
+      // Validate item has required fields
+      if (!item._id || !item.name || !item.price || !item.quantity) {
+        throw new Error(`Item thiếu thông tin bắt buộc: ${JSON.stringify(item)}`);
+      }
+      
       // Apply discount if active
       if (item.discountType && item.discountType !== 'none') {
         const now = new Date();
@@ -586,7 +645,7 @@ app.post("/api/orders/create-from-session", verifyToken, async (req, res) => {
         name: item.name,
         price: item.price,
         quantity: item.quantity,
-        image: item.image,
+        image: item.image || '',
         discountType: item.discountType || 'none',
         discountValue: item.discountValue || 0,
         finalPrice: finalPrice
@@ -605,8 +664,13 @@ app.post("/api/orders/create-from-session", verifyToken, async (req, res) => {
     
     await order.save();
     
-    // Populate game details for response
-    await order.populate('items.game', 'name genre image rating');
+    // Try to populate game details, but handle errors gracefully
+    try {
+      await order.populate('items.game', 'name genre image rating');
+    } catch (populateError) {
+      console.warn('⚠️ Could not populate game details:', populateError.message);
+      // Continue without population - the order is still saved
+    }
     
     console.log(`✅ Order created from frontend: ${order._id} for user ${userId}`);
     
@@ -635,24 +699,35 @@ app.post("/api/stripe/webhook", async (req, res) => {
       const session = event.data.object;
       
       try {
-        // Create order from completed session
-        const orderData = {
-          items: session.display_items || [],
-          totalAmount: session.amount_total / 100, // Convert from cents
-          paymentMethod: "stripe",
-          paymentId: session.id,
-          status: "completed"
-        };
-
-        // Get user from session metadata or create guest order
-        const userId = session.metadata?.userId;
-        if (userId) {
-          orderData.user = userId;
+        // Check if order already exists for this session
+        const existingOrder = await Order.findOne({ paymentId: session.id });
+        if (existingOrder) {
+          console.log(`⚠️ Order already exists for session ${session.id}: ${existingOrder._id}`);
+          break;
+        }
+        
+        // Get user ID from multiple sources
+        let userId = session.metadata?.userId || session.client_reference_id;
+        
+        // Only create order if we have a valid user ID (not 'guest')
+        if (userId && userId !== 'guest') {
+          // We need to get cart items from the session or create a basic order
+          // For now, create a basic order structure
+          const orderData = {
+            user: userId,
+            items: [], // Will be populated by frontend via create-from-session
+            totalAmount: session.amount_total / 100, // Convert from cents
+            paymentMethod: "stripe",
+            paymentId: session.id,
+            status: "completed"
+          };
           
           const order = new Order(orderData);
           await order.save();
           
-          console.log(`✅ Order created for user ${userId}: ${order._id}`);
+          console.log(`✅ Order created from webhook for user ${userId}: ${order._id}`);
+        } else {
+          console.log(`⚠️ No valid user ID found in session ${session.id}, skipping order creation`);
         }
       } catch (error) {
         console.error("Error creating order from webhook:", error);
