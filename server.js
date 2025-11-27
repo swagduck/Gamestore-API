@@ -14,7 +14,6 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 const NodeCache = require("node-cache");
 const bcrypt = require("bcryptjs"); // For password hashing
 const jwt = require("jsonwebtoken"); // For authentication tokens
-const simpleChatRouter = require("./simpleChatAPI"); // New simple chat API
 
 // --- Initialize Cache ---
 const myCache = new NodeCache({ stdTTL: 300, checkperiod: 120 }); // Cache for 5 minutes
@@ -55,9 +54,6 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 console.log(">>> SERVER: JSON and URL-encoded middleware applied.");
 
-// Use simple chat API
-app.use("/api", simpleChatRouter);
-console.log(">>> SERVER: Simple Chat API loaded");
 
 // --- Connect to Database ---
 console.log(">>> SERVER: Attempting DB connection...");
