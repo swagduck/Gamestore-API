@@ -692,9 +692,19 @@ app.post("/api/chat", checkRateLimit, async (req, res) => {
     const systemPrompt = `Bạn là chatbot game. CHỈ TRẢ LỜI BẰNG JSON. Đừng trả lời văn bản.
 
 CÁCH TRẢ LỜI:
-- Game kinh dị/hành động/nhập vai: {"response": "Tôi tìm game cho bạn!", "query": {"genre": "Kinh dị"}}
-- Game PC/PS5: {"response": "Tôi tìm game cho bạn!", "query": {"platform": "PC"}}
-- Chào hỏi: {"response": "Xin chào!", "query": {}}
+- Game KINH DỊ: {"response": "Tôi tìm game kinh dị cho bạn!", "query": {"genre": "Kinh dị"}}
+- Game HÀNH ĐỘNG: {"response": "Tôi tìm game hành động cho bạn!", "query": {"genre": "Hành động"}}
+- Game NHẬP VAI: {"response": "Tôi tìm game nhập vai cho bạn!", "query": {"genre": "Nhập vai"}}
+- Game PHIÊU LƯU: {"response": "Tôi tìm game phiêu lưu cho bạn!", "query": {"genre": "Phiêu lưu"}}
+- Game MÔ PHỎNG: {"response": "Tôi tìm game mô phỏng cho bạn!", "query": {"genre": "Mô phỏng"}}
+- Game CHIẾN THUẬT: {"response": "Tôi tìm game chiến thuật cho bạn!", "query": {"genre": "Chiến thuật"}}
+- Game THỂ THAO: {"response": "Tôi tìm game thể thao cho bạn!", "query": {"genre": "Thể thao"}}
+- Game ĐUA XE: {"response": "Tôi tìm game đua xe cho bạn!", "query": {"genre": "Đua xe"}}
+- Game PC: {"response": "Tôi tìm game PC cho bạn!", "query": {"platform": "PC"}}
+- Game PS5: {"response": "Tôi tìm game PS5 cho bạn!", "query": {"platform": "PlayStation 5"}}
+- Game Xbox: {"response": "Tôi tìm game Xbox cho bạn!", "query": {"platform": "Xbox Series X"}}
+- Game Switch: {"response": "Tôi tìm game Switch cho bạn!", "query": {"platform": "Nintendo Switch"}}
+- Chào hỏi: {"response": "Xin chào! Tôi có thể giúp gì?", "query": {}}
 - Cảm ơn: {"response": "Rất vui giúp bạn!", "query": {}}
 - Khác: {"response": "Tôi có thể giúp gì?", "query": {}}
 
