@@ -867,37 +867,41 @@ app.post("/api/stripe/webhook", async (req, res) => {
   res.send();
 });
 
-// == Chatbot Route ==
+// == Chatbot Route (Gemini AI) ==
 app.post("/api/chat", checkRateLimit, async (req, res) => {
   try {
     const { message, history } = req.body;
     console.log('🤖 Chat API Request:', { message, historyLength: history?.length });
-    console.log('🤖 History sample:', history?.slice(0, 2));
-    const systemPrompt = `JSON ONLY. NO TEXT.
 
-User asks for horror game: {"response":"Tìm game kinh dị","query":{"genre":"Kinh dị"}}
-User asks for action game: {"response":"Tìm game hành động","query":{"genre":"Hành động"}}
-User asks for RPG game: {"response":"Tìm game nhập vai","query":{"genre":"Nhập vai"}}
-User asks for adventure game: {"response":"Tìm game phiêu lưu","query":{"genre":"Phiêu lưu"}}
-User asks for simulation game: {"response":"Tìm game mô phỏng","query":{"genre":"Mô phỏng"}}
-User asks for strategy game: {"response":"Tìm game chiến thuật","query":{"genre":"Chiến thuật"}}
-User asks for sports game: {"response":"Tìm game thể thao","query":{"genre":"Thể thao"}}
-User asks for racing game: {"response":"Tìm game đua xe","query":{"genre":"Đua xe"}}
-User asks for PC games: {"response":"Tìm game PC","query":{"platform":"PC"}}
-User asks for PS5 games: {"response":"Tìm game PS5","query":{"platform":"PlayStation 5"}}
-User asks for Xbox games: {"response":"Tìm game Xbox","query":{"platform":"Xbox Series X"}}
-User asks for Switch games: {"response":"Tìm game Switch","query":{"platform":"Nintendo Switch"}}
-User says hello: {"response":"Xin chào","query":{}}
-User says thanks: {"response":"Rất vui giúp bạn","query":{}}
-Other: {"response":"Tôi có thể giúp gì","query":{}}`;
-    console.log('🤖 Initializing Gemini AI...');
+    const systemPrompt = `Bạn là GameBot AI - trợ lý mua sắm game thông minh. Bạn PHẢI trả lời ĐÚNG FORMAT JSON, không được thêm text nào khác bên ngoài JSON.
+
+FORMAT BẮT BUỘC: {"response":"<câu trả lời tiếng Việt>","query":{<query tìm game nếu có>}}
+
+VÍ DỤ:
+- Hỏi game kinh dị: {"response":"Để tôi tìm game kinh dị cho bạn nhé! 🎮","query":{"genre":"Kinh dị"}}
+- Hỏi game hành động: {"response":"Đây là các game hành động hay nhất! 💥","query":{"genre":"Hành động"}}
+- Hỏi game nhập vai/RPG: {"response":"Game nhập vai đây! ⚔️","query":{"genre":"Nhập vai"}}
+- Hỏi game phiêu lưu: {"response":"Game phiêu lưu thú vị nè! 🗺️","query":{"genre":"Phiêu lưu"}}
+- Hỏi game mô phỏng: {"response":"Game mô phỏng cho bạn! 🏗️","query":{"genre":"Mô phỏng"}}
+- Hỏi game chiến thuật: {"response":"Game chiến thuật đây! 🧠","query":{"genre":"Chiến thuật"}}
+- Hỏi game thể thao: {"response":"Game thể thao nè! ⚽","query":{"genre":"Thể thao"}}
+- Hỏi game đua xe: {"response":"Game đua xe tốc độ! 🏎️","query":{"genre":"Đua xe"}}
+- Hỏi game PC: {"response":"Game PC cho bạn! 🖥️","query":{"platform":"PC"}}
+- Hỏi game PS5: {"response":"Game PS5 đây! 🎮","query":{"platform":"PlayStation 5"}}
+- Hỏi game Xbox: {"response":"Game Xbox nè! 🟢","query":{"platform":"Xbox Series X"}}
+- Hỏi game Switch: {"response":"Game Switch cho bạn! 🔴","query":{"platform":"Nintendo Switch"}}
+- Chào hỏi: {"response":"Xin chào! Tôi là GameBot 🤖 Tôi có thể giúp bạn tìm game theo thể loại, nền tảng, hoặc gợi ý game hay. Bạn muốn tìm game gì?","query":{}}
+- Cảm ơn: {"response":"Rất vui được giúp bạn! 😊 Nếu cần tìm thêm game, cứ hỏi tôi nhé!","query":{}}
+- Câu hỏi khác: {"response":"Tôi có thể giúp bạn tìm game theo thể loại hoặc nền tảng. Bạn thích thể loại game nào?","query":{}}
+
+NHỚ: CHỈ TRẢ VỀ JSON, KHÔNG CÓ TEXT KHÁC.`;
+
     if (!process.env.GEMINI_API_KEY) {
       console.error('❌ GEMINI_API_KEY not found in environment');
       return res.status(500).json({ text: "AI service not configured properly" });
     }
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
-    console.log('🤖 Gemini AI initialized successfully');
+    const chatModel = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
     
     const formattedHistory = history
       .filter((msg) => msg.id !== 1)
@@ -906,67 +910,62 @@ Other: {"response":"Tôi có thể giúp gì","query":{}}`;
         parts: [{ text: msg.text }],
       }))
       .filter((msg, index, arr) => {
-        // Remove any bot messages that come before user messages
         if (msg.role !== "user") {
-          // Keep bot messages only if there's a user message before them
           const hasUserBefore = arr.slice(0, index).some(m => m.role === "user");
           return hasUserBefore;
         }
         return true;
       })
-      .filter((msg, index, arr) => {
-        // Ensure first message is from user
+      .filter((msg, index) => {
         if (index === 0 && msg.role !== "user") return false;
         return true;
       });
-    const chat = model.startChat({
+
+    const chat = chatModel.startChat({
       history: formattedHistory,
       systemInstruction: {
         parts: [{ text: systemPrompt }],
       },
     });
+
     console.log('🤖 Sending message to Gemini:', message);
     const result = await chat.sendMessage(message);
     const aiResponseText = result.response.text();
     console.log('🤖 Gemini raw response:', aiResponseText);
+
     let aiJson;
     try {
       const cleanedJsonText = aiResponseText
         .replace(/```json\n|```/g, "")
         .trim();
-      aiJson = JSON.parse(cleanedJsonText);
-    } catch (e) {
-      console.error("Lỗi parse JSON từ AI:", aiResponseText);
-      console.log("🤖 AI returned non-JSON response, using as plain text...");
       
-      // If AI returns plain text, use it directly as the response
-      const fallbackResponse = {
-        response: aiResponseText.trim(),
-        query: {}
-      };
+      const jsonMatch = cleanedJsonText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        aiJson = JSON.parse(jsonMatch[0]);
+      } else {
+        throw new Error("No JSON found in response");
+      }
+    } catch (e) {
+      console.log("🤖 AI returned non-JSON, using as plain text...");
       return res.json({
-        text: fallbackResponse.response,
+        text: aiResponseText.trim() || "Tôi có thể giúp bạn tìm game! Hãy cho tôi biết bạn thích thể loại gì?",
         results: [],
       });
     }
+
     let gameResults = [];
-    if (
-      aiJson.query &&
-      (aiJson.query.genre || aiJson.query.platform || aiJson.query.name)
-    ) {
+    if (aiJson.query && (aiJson.query.genre || aiJson.query.platform || aiJson.query.name)) {
       gameResults = await Game.find(aiJson.query).limit(5);
     }
+
     res.json({
-      text: aiJson.response,
+      text: aiJson.response || "Tôi có thể giúp bạn tìm game!",
       results: gameResults,
     });
   } catch (error) {
     console.error('❌ Chat API Error:', error);
-    console.error('❌ Request body:', req.body);
-    console.error('❌ Error stack:', error.stack);
     
-    // Handle specific API limit errors
-    if (error.message.includes('quota') || error.message.includes('limit') || error.status === 429) {
+    if (error.message?.includes('quota') || error.message?.includes('limit') || error.status === 429) {
       res.status(429).json({
         text: "Bot đang quá tải, vui lòng thử lại sau vài phút!",
         error: "API_LIMIT_EXCEEDED"
