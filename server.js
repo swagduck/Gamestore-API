@@ -154,6 +154,44 @@ const verifyAdmin = async (req, res, next) => {
 // --- API ROUTES ---
 console.log(">>> SERVER: Defining API routes...");
 
+// == Database Status Route ==
+app.get("/api/status", async (req, res) => {
+  try {
+    const dbState = mongoose.connection.readyState;
+    const dbStates = {
+      0: 'disconnected',
+      1: 'connected', 
+      2: 'connecting',
+      3: 'disconnecting'
+    };
+    
+    const gameCount = await Game.countDocuments();
+    const dbName = mongoose.connection.name;
+    const mongoUri = process.env.MONGO_URI ? 'Set' : 'Not set';
+    
+    res.json({
+      database: {
+        state: dbStates[dbState],
+        name: dbName,
+        gameCount: gameCount,
+        mongoUriConfigured: mongoUri
+      },
+      server: {
+        status: 'running',
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: error.message,
+      database: {
+        state: 'error',
+        mongoUriConfigured: process.env.MONGO_URI ? 'Set' : 'Not set'
+      }
+    });
+  }
+});
+
 // == Game Routes (CORRECT ORDER) ==
 
 // 1. GET All Games (with sorting, filtering, and pagination)
