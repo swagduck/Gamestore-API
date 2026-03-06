@@ -57,12 +57,25 @@ console.log(">>> SERVER: JSON and URL-encoded middleware applied.");
 
 // --- Connect to Database ---
 console.log(">>> SERVER: Attempting DB connection...");
+
+// MongoDB connection options with timeout settings
+const mongoOptions = {
+  serverSelectionTimeoutMS: 5000, // 5 seconds timeout for server selection
+  socketTimeoutMS: 45000, // 45 seconds for socket operations
+  connectTimeoutMS: 10000, // 10 seconds for initial connection
+  retryWrites: true,
+  w: 'majority'
+};
+
 mongoose
-  .connect(process.env.MONGO_URI)
+  .connect(process.env.MONGO_URI, mongoOptions)
   .then(() => {
     console.log("Kết nối MongoDB Atlas thành công!");
   })
-  .catch((err) => console.error("Lỗi kết nối MongoDB:", err));
+  .catch((err) => {
+    console.error("Lỗi kết nối MongoDB:", err);
+    // Don't exit the process, let the server continue running
+  });
 
 // --- Rate Limiting for Chat API ---
 const chatRateLimit = new Map(); // Simple in-memory rate limit
@@ -146,6 +159,13 @@ console.log(">>> SERVER: Defining API routes...");
 // 1. GET All Games (with sorting, filtering, and pagination)
 app.get("/api/games", async (req, res) => {
   try {
+    // Check if MongoDB is connected
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ 
+        message: "Database temporarily unavailable. Please try again later." 
+      });
+    }
+
     const { limit, sort, order = "desc" } = req.query;
 
     let query = Game.find();
@@ -164,6 +184,11 @@ app.get("/api/games", async (req, res) => {
     res.json(games);
   } catch (err) {
     console.log("Lỗi server /api/games:", err.message);
+    if (err.name === 'MongooseServerSelectionError') {
+      return res.status(503).json({ 
+        message: "Database temporarily unavailable. Please try again later." 
+      });
+    }
     res.status(500).json({ message: err.message });
   }
 });
@@ -1231,6 +1256,13 @@ app.post("/api/auth/reset-password", async (req, res) => {
 // GET analytics data
 app.get("/api/analytics", async (req, res) => {
   try {
+    // Check if MongoDB is connected
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ 
+        message: "Database temporarily unavailable. Please try again later." 
+      });
+    }
+
     let analytics = await Analytics.findOne();
 
     if (!analytics) {
@@ -1324,6 +1356,11 @@ app.get("/api/analytics", async (req, res) => {
     });
   } catch (error) {
     console.error("Lỗi khi lấy analytics data:", error);
+    if (error.name === 'MongooseServerSelectionError' || error.message.includes('buffering timed out')) {
+      return res.status(503).json({ 
+        message: "Database temporarily unavailable. Please try again later." 
+      });
+    }
     res.status(500).json({ message: "Lỗi máy chủ khi lấy dữ liệu thống kê." });
   }
 });
