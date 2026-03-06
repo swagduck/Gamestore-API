@@ -111,6 +111,13 @@ const checkRateLimit = (req, res, next) => {
   next();
 };
 
+// --- Helper Functions ---
+const generateOrderNumber = () => {
+  const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const random = Math.random().toString(36).substr(2, 4).toUpperCase();
+  return `GAMPERS-${date}-${random}`;
+};
+
 // --- AUTH MIDDLEWARE ---
 const verifyToken = async (req, res, next) => {
   try {
@@ -593,6 +600,7 @@ app.post("/api/test-payment", verifyToken, async (req, res) => {
       
       const order = new Order({
         user: userId,
+        orderNumber: generateOrderNumber(),
         items: orderItems,
         totalAmount: total,
         paymentMethod: 'test',
@@ -785,6 +793,7 @@ app.post("/api/orders/create-from-session", verifyToken, async (req, res) => {
     // Create order
     const order = new Order({
       user: userId,
+      orderNumber: generateOrderNumber(),
       items: orderItems,
       totalAmount,
       paymentMethod: 'stripe',
@@ -845,6 +854,7 @@ app.post("/api/stripe/webhook", async (req, res) => {
           // For now, create a basic order structure
           const orderData = {
             user: userId,
+            orderNumber: generateOrderNumber(),
             items: [], // Will be populated by frontend via create-from-session
             totalAmount: session.amount_total / 100, // Convert from cents
             paymentMethod: "stripe",
@@ -1207,10 +1217,11 @@ app.post("/api/orders", verifyToken, async (req, res) => {
     
     const order = new Order({
       user: userId,
+      orderNumber: generateOrderNumber(),
       items,
       totalAmount,
       paymentMethod,
-      paymentId,
+      paymentId: paymentId || `manual_${Date.now()}`,
       status
     });
     

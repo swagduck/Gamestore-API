@@ -6,6 +6,11 @@ const orderSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  orderNumber: {
+    type: String,
+    unique: true,
+    required: true
+  },
   items: [{
     game: {
       type: mongoose.Schema.Types.ObjectId,
