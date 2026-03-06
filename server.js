@@ -677,14 +677,14 @@ app.post("/api/create-checkout-session", verifyToken, async (req, res) => {
 
       // Basic validation for image URL
       let imageUrl = item.image;
-      if (typeof imageUrl !== "string" || !imageUrl.startsWith("/")) {
-        console.warn(
-          `Invalid image URL for ${item.name}: ${imageUrl}. Using placeholder.`
-        );
-        // Provide a fallback placeholder image URL if needed
-        imageUrl = "https://via.placeholder.com/80x80?text=No+Image";
-      } else {
-        imageUrl = `http://localhost:5173${imageUrl}`; // Prepend base URL
+      if (typeof imageUrl !== "string" || !imageUrl.startsWith("http")) {
+        // If it starts with / it's a relative path, prepend frontend URL
+        if (typeof imageUrl === "string" && imageUrl.startsWith("/")) {
+          imageUrl = `${process.env.FRONTEND_URL}${imageUrl}`;
+        } else {
+          console.warn(`Invalid image URL for ${item.name}: ${imageUrl}. Using placeholder.`);
+          imageUrl = "https://via.placeholder.com/200x200?text=" + encodeURIComponent(item.name);
+        }
       }
 
       return {
@@ -755,8 +755,8 @@ app.post("/api/orders/create-from-session", verifyToken, async (req, res) => {
     const orderItems = cartItems.map(item => {
       let finalPrice = item.price;
       
-      // Validate item has required fields
-      if (!item._id || !item.name || !item.price || !item.quantity) {
+      // Validate item has required fields (allow price 0 for free games)
+      if (!item._id || !item.name || item.price === undefined || !item.quantity) {
         throw new Error(`Item thiếu thông tin bắt buộc: ${JSON.stringify(item)}`);
       }
       
@@ -864,7 +864,7 @@ app.post("/api/stripe/webhook", async (req, res) => {
               name: item.description,
               price: parseFloat(metadata.originalPrice) || (item.amount_total / 100 / item.quantity),
               quantity: item.quantity,
-              image: product.images?.[0] || '',
+              image: product.images?.[0] || 'https://via.placeholder.com/200x200?text=Game',
               discountType: metadata.discountType || 'none',
               discountValue: parseFloat(metadata.discountValue) || 0,
               finalPrice: item.amount_total / 100 / item.quantity

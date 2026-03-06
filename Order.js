@@ -32,7 +32,7 @@ const orderSchema = new mongoose.Schema({
     },
     image: {
       type: String,
-      required: true
+      default: ''
     },
     // Discount information
     discountType: {
