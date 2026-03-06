@@ -625,6 +625,27 @@ app.post("/api/test-payment", verifyToken, async (req, res) => {
 app.post("/api/create-checkout-session", verifyToken, async (req, res) => {
   try {
     const { cartItems } = req.body;
+
+    // Check for already-owned games before checkout
+    const userId = req.user?._id;
+    if (userId) {
+      const completedOrders = await Order.find({ user: userId, status: 'completed' });
+      const ownedGameIds = new Set();
+      completedOrders.forEach(order => {
+        order.items.forEach(item => {
+          if (item.game) ownedGameIds.add(item.game.toString());
+        });
+      });
+
+      const alreadyOwned = cartItems.filter(item => ownedGameIds.has(item._id));
+      if (alreadyOwned.length > 0) {
+        return res.status(400).json({
+          message: `Bạn đã sở hữu: ${alreadyOwned.map(g => g.name).join(', ')}. Vui lòng xóa khỏi giỏ hàng.`,
+          ownedGames: alreadyOwned.map(g => g._id)
+        });
+      }
+    }
+
     const line_items = cartItems.map((item) => {
       // Calculate discounted price
       let finalPrice = item.price;
@@ -1050,6 +1071,26 @@ app.get("/api/orders/purchased-games", verifyToken, async (req, res) => {
   } catch (error) {
     console.error("Lỗi khi lấy game đã mua:", error);
     res.status(500).json({ message: "Lỗi máy chủ khi lấy game đã mua" });
+  }
+});
+
+// GET owned game IDs only (lightweight)
+app.get("/api/orders/owned-game-ids", verifyToken, async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const orders = await Order.find({ user: userId, status: 'completed' });
+    
+    const ownedIds = new Set();
+    orders.forEach(order => {
+      order.items.forEach(item => {
+        if (item.game) ownedIds.add(item.game.toString());
+      });
+    });
+    
+    res.json([...ownedIds]);
+  } catch (error) {
+    console.error("Lỗi khi lấy owned game IDs:", error);
+    res.status(500).json({ message: "Lỗi máy chủ" });
   }
 });
 
