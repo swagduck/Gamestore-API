@@ -296,6 +296,40 @@ app.get("/api/games/search", async (req, res) => {
   }
 });
 
+// 4. GET Discounted & Free Games Only
+app.get("/api/games/discounted", async (req, res) => {
+  try {
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({
+        message: "Database temporarily unavailable. Please try again later."
+      });
+    }
+
+    const now = new Date();
+
+    // Find games that are free OR have an active discount
+    const games = await Game.find({
+      $or: [
+        { isFree: true },
+        {
+          discountType: { $in: ['percentage', 'fixed'] },
+          discountValue: { $gt: 0 },
+          $and: [
+            { $or: [{ discountStartDate: null }, { discountStartDate: { $lte: now } }] },
+            { $or: [{ discountEndDate: null }, { discountEndDate: { $gte: now } }] }
+          ]
+        }
+      ]
+    });
+
+    console.log(`🎯 Discounted/Free games found: ${games.length}`);
+    res.json(games);
+  } catch (err) {
+    console.error("Lỗi khi lấy game giảm giá:", err.message);
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // == Review Routes ==
 
 // GET all reviews for a game
