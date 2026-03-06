@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const Game = require('./Game');
 
-mongoose.connect('mongodb+srv://hoanguy:Z162wMcmQhICmXcb@mongodb.p9ncspb.mongodb.net/gameDatabase?retryWrites=true&w=majority&appName=MongoDB')
+mongoose.connect(process.env.MONGO_URI)
 .then(async () => {
   console.log('Connected to MongoDB');
   

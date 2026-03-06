@@ -840,37 +840,64 @@ app.post("/api/stripe/webhook", async (req, res) => {
       try {
         // Check if order already exists for this session
         const existingOrder = await Order.findOne({ paymentId: session.id });
-        if (existingOrder) {
-          console.log(`⚠️ Order already exists for session ${session.id}: ${existingOrder._id}`);
+        if (existingOrder && existingOrder.items.length > 0) {
+          console.log(`⚠️ Order already exists and populated for session ${session.id}: ${existingOrder._id}`);
           break;
         }
         
         // Get user ID from multiple sources
         let userId = session.metadata?.userId || session.client_reference_id;
         
-        // Only create order if we have a valid user ID (not 'guest')
+        // Only create or update order if we have a valid user ID (not 'guest')
         if (userId && userId !== 'guest') {
-          // We need to get cart items from the session or create a basic order
-          // For now, create a basic order structure
-          const orderData = {
-            user: userId,
-            orderNumber: generateOrderNumber(),
-            items: [], // Will be populated by frontend via create-from-session
-            totalAmount: session.amount_total / 100, // Convert from cents
-            paymentMethod: "stripe",
-            paymentId: session.id,
-            status: "completed"
-          };
-          
-          const order = new Order(orderData);
-          await order.save();
-          
-          console.log(`✅ Order created from webhook for user ${userId}: ${order._id}`);
+          // Fetch line items to get products
+          const lineItems = await stripe.checkout.sessions.listLineItems(session.id, {
+            expand: ['data.price.product']
+          });
+
+          const orderItems = lineItems.data.map(item => {
+            const product = item.price.product;
+            const metadata = product.metadata || {};
+            
+            return {
+              game: metadata.id,
+              name: item.description,
+              price: parseFloat(metadata.originalPrice) || (item.amount_total / 100 / item.quantity),
+              quantity: item.quantity,
+              image: product.images?.[0] || '',
+              discountType: metadata.discountType || 'none',
+              discountValue: parseFloat(metadata.discountValue) || 0,
+              finalPrice: item.amount_total / 100 / item.quantity
+            };
+          });
+
+          if (existingOrder) {
+            // Update the basic order created previously (if any)
+            existingOrder.items = orderItems;
+            existingOrder.totalAmount = session.amount_total / 100;
+            await existingOrder.save();
+            console.log(`✅ Order updated from webhook with ${orderItems.length} items: ${existingOrder._id}`);
+          } else {
+            // Create a new order if it doesn't exist
+            const orderData = {
+              user: userId,
+              orderNumber: generateOrderNumber(),
+              items: orderItems,
+              totalAmount: session.amount_total / 100,
+              paymentMethod: "stripe",
+              paymentId: session.id,
+              status: "completed"
+            };
+            
+            const order = new Order(orderData);
+            await order.save();
+            console.log(`✅ Order created from webhook with ${orderItems.length} items for user ${userId}: ${order._id}`);
+          }
         } else {
           console.log(`⚠️ No valid user ID found in session ${session.id}, skipping order creation`);
         }
       } catch (error) {
-        console.error("Error creating order from webhook:", error);
+        console.error("Error processing checkout.session.completed webhook:", error);
       }
       break;
 
