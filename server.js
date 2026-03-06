@@ -154,6 +154,17 @@ const verifyAdmin = async (req, res, next) => {
 // --- API ROUTES ---
 console.log(">>> SERVER: Defining API routes...");
 
+// == Test Route (No Database Required) ==
+app.get("/api/test", (req, res) => {
+  res.json({
+    message: "API is working!",
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    mongoUriSet: !!process.env.MONGO_URI,
+    port: process.env.PORT || 4000
+  });
+});
+
 // == Database Status Route ==
 app.get("/api/status", async (req, res) => {
   try {
