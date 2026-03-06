@@ -118,6 +118,61 @@ const generateOrderNumber = () => {
   return `GAMPERS-${date}-${random}`;
 };
 
+const syncAnalytics = async (order) => {
+  try {
+    // Determine the items to sync
+    const items = order.items || [];
+    
+    // Add to Analytics.orders collection
+    await Analytics.findOneAndUpdate(
+      {},
+      {
+        $push: {
+          orders: {
+            _id: order._id.toString(),
+            userId: order.user?.toString(),
+            items: items.map(item => ({
+              gameId: item.game?.toString() || item.gameId,
+              name: item.name,
+              price: item.price,
+              quantity: item.quantity,
+              finalPrice: item.finalPrice || item.price,
+              platform: Array.isArray(item.platform) ? item.platform : [item.platform].filter(Boolean),
+              genre: Array.isArray(item.genre) ? item.genre : [item.genre].filter(Boolean)
+            })),
+            total: order.totalAmount,
+            itemCount: items.length,
+            date: order.createdAt || new Date(),
+            status: order.status || 'completed'
+          }
+        },
+        $set: { lastUpdated: new Date() }
+      },
+      { upsert: true }
+    );
+    
+    // Update games names cache list in analytics if missing
+    for (const item of items) {
+      const gId = item.game?.toString() || item.gameId;
+      if (gId && item.name) {
+        // Only push if this gameId not in the games list already
+        const analytics = await Analytics.findOne({});
+        const gameExists = analytics?.games?.some(g => g._id === gId);
+        if (!gameExists) {
+          await Analytics.findOneAndUpdate(
+            {},
+            { $push: { games: { _id: gId, name: item.name } } }
+          );
+        }
+      }
+    }
+    console.log(`📊 Analytics synchronized for order: ${order._id}`);
+  } catch (error) {
+    console.error('⚠️ Could not sync analytics:', error.message);
+  }
+};
+
+
 // --- AUTH MIDDLEWARE ---
 const verifyToken = async (req, res, next) => {
   try {
@@ -129,7 +184,10 @@ const verifyToken = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = { _id: decoded.userId }; // Gắn ID người dùng vào request
+    req.user = { 
+      _id: decoded.userId,
+      isAdmin: decoded.isAdmin // Ensure isAdmin is available
+    };
     next();
   } catch (error) {
     res.status(401).json({ message: "Token không hợp lệ" });
@@ -813,6 +871,9 @@ app.post("/api/orders/create-from-session", verifyToken, async (req, res) => {
     
     console.log(`✅ Order created from frontend: ${order._id} for user ${userId}`);
     
+    // Update analytics
+    await syncAnalytics(order);
+    
     res.status(201).json(order);
   } catch (error) {
     console.error("Lỗi khi tạo đơn hàng từ session:", error);
@@ -892,6 +953,9 @@ app.post("/api/stripe/webhook", async (req, res) => {
             const order = new Order(orderData);
             await order.save();
             console.log(`✅ Order created from webhook with ${orderItems.length} items for user ${userId}: ${order._id}`);
+
+            // Update analytics
+            await syncAnalytics(order);
           }
         } else {
           console.log(`⚠️ No valid user ID found in session ${session.id}, skipping order creation`);
@@ -1132,7 +1196,7 @@ app.get("/api/orders/owned-game-ids", verifyToken, async (req, res) => {
 });
 
 // ==Admin: GET all orders (admin only) ==
-app.get("/api/admin/orders", verifyToken, async (req, res) => {
+app.get("/api/admin/orders", verifyAdmin, async (req, res) => {
   try {
     if (!req.user.isAdmin) return res.status(403).json({ message: "Không có quyền truy cập" });
 
@@ -1165,7 +1229,7 @@ app.get("/api/admin/orders", verifyToken, async (req, res) => {
 });
 
 // == Admin: Revenue stats ==
-app.get("/api/admin/stats", verifyToken, async (req, res) => {
+app.get("/api/admin/stats", verifyAdmin, async (req, res) => {
   try {
     if (!req.user.isAdmin) return res.status(403).json({ message: "Không có quyền truy cập" });
 
@@ -1258,25 +1322,7 @@ app.post("/api/orders", verifyToken, async (req, res) => {
     await order.populate('items.game', 'name genre image rating');
     
     // Update analytics
-    await Analytics.findOneAndUpdate(
-      {},
-      {
-        $push: {
-          orders: {
-            userId,
-            items: items.map(item => ({
-              gameId: item.game,
-              name: item.name,
-              quantity: item.quantity,
-              price: item.finalPrice || item.price
-            })),
-            total: totalAmount,
-            createdAt: new Date()
-          }
-        }
-      },
-      { upsert: true }
-    );
+    await syncAnalytics(order);
     
     res.status(201).json(order);
   } catch (error) {
