@@ -1094,6 +1094,80 @@ app.get("/api/orders/owned-game-ids", verifyToken, async (req, res) => {
   }
 });
 
+// ==Admin: GET all orders (admin only) ==
+app.get("/api/admin/orders", verifyToken, async (req, res) => {
+  try {
+    if (!req.user.isAdmin) return res.status(403).json({ message: "Không có quyền truy cập" });
+
+    const { page = 1, limit = 20, status } = req.query;
+    const query = {};
+    if (status && status !== 'all') query.status = status;
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const total = await Order.countDocuments(query);
+    const orders = await Order.find(query)
+      .populate('user', 'email')
+      .populate('items.game', 'name image price')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    res.json({
+      orders,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    });
+  } catch (error) {
+    console.error("Lỗi admin orders:", error);
+    res.status(500).json({ message: "Lỗi máy chủ" });
+  }
+});
+
+// == Admin: Revenue stats ==
+app.get("/api/admin/stats", verifyToken, async (req, res) => {
+  try {
+    if (!req.user.isAdmin) return res.status(403).json({ message: "Không có quyền truy cập" });
+
+    const completedOrders = await Order.find({ status: 'completed' })
+      .populate('items.game', 'name image price genre');
+
+    const totalRevenue = completedOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+    const totalOrders = completedOrders.length;
+    const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+
+    // Top selling games
+    const gameSalesMap = {};
+    completedOrders.forEach(order => {
+      order.items.forEach(item => {
+        const gameId = item.game?._id?.toString() || item.game?.toString();
+        const gameName = item.game?.name || item.name || 'Unknown';
+        const gameImage = item.game?.image || item.image || '';
+        const price = item.finalPrice || item.price || 0;
+        if (gameId) {
+          if (!gameSalesMap[gameId]) {
+            gameSalesMap[gameId] = { _id: gameId, name: gameName, image: gameImage, sold: 0, revenue: 0 };
+          }
+          gameSalesMap[gameId].sold += 1;
+          gameSalesMap[gameId].revenue += price;
+        }
+      });
+    });
+    const topSelling = Object.values(gameSalesMap)
+      .sort((a, b) => b.sold - a.sold)
+      .slice(0, 10);
+
+    res.json({ totalRevenue, totalOrders, avgOrderValue, topSelling });
+  } catch (error) {
+    console.error("Lỗi admin stats:", error);
+    res.status(500).json({ message: "Lỗi máy chủ" });
+  }
+});
+
+
 // GET single order details
 app.get("/api/orders/:id", verifyToken, async (req, res) => {
   try {
