@@ -32,8 +32,9 @@ app.use(cors({
   origin: [
     'http://localhost:5173',
     'http://localhost:5174',
-    'https://my-ecommerce-ej2q51xzh-swagducks-projects.vercel.app',
+    'https://my-ecommerce-7unj4e1ps-swagducks-projects.vercel.app',
     'https://my-ecommerce-app-red.vercel.app',
+    'https://my-ecommerce-ej2q51xzh-swagducks-projects.vercel.app',
     'https://my-ecommerce-3mdxa4qep-swagducks-projects.vercel.app',
     'https://my-ecommerce-ijvt7e7kl-swagducks-projects.vercel.app',
     'https://my-ecommerce-ahkdafcwc-swagducks-projects.vercel.app',
