@@ -458,22 +458,26 @@ app.post("/api/games/:id/reviews", verifyToken, async (req, res) => {
       return res.status(404).json({ message: "Không tìm thấy game." });
     }
 
-    const alreadyReviewed = await Review.findOne({
+    let review = await Review.findOne({
       game: gameId,
       user: userId,
     });
-    if (alreadyReviewed) {
-      return res.status(400).json({ message: "Bạn đã đánh giá game này rồi." });
+
+    if (review) {
+      // Cập nhật đánh giá hiện có
+      review.rating = Number(rating);
+      review.comment = comment;
+      await review.save();
+    } else {
+      // Tạo đánh giá mới
+      review = new Review({
+        game: gameId,
+        user: userId,
+        rating: Number(rating),
+        comment,
+      });
+      await review.save();
     }
-
-    const review = new Review({
-      game: gameId,
-      user: userId,
-      rating: Number(rating),
-      comment,
-    });
-
-    await review.save();
 
     // Update game's rating and numReviews
     const reviews = await Review.find({ game: gameId });
@@ -483,7 +487,10 @@ app.post("/api/games/:id/reviews", verifyToken, async (req, res) => {
 
     await game.save();
 
-    res.status(201).json({ message: "Cảm ơn bạn đã đánh giá!" });
+    res.status(review.isNew ? 201 : 200).json({ 
+      message: review.isNew ? "Cảm ơn bạn đã đánh giá!" : "Đã cập nhật đánh giá của bạn!",
+      review 
+    });
   } catch (error) {
     console.error("Lỗi khi thêm đánh giá:", error);
     if (error.name === "ValidationError") {
