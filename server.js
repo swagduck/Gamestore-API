@@ -1,4 +1,4 @@
-﻿const express = require("express");
+const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 require("dotenv").config();
@@ -406,6 +406,42 @@ app.get("/api/games/:id/reviews", async (req, res) => {
     res.json(reviews);
   } catch (error) {
     console.error("Lỗi khi lấy đánh giá:", error);
+    res.status(500).json({ message: "Lỗi máy chủ" });
+  }
+});
+
+// Mark a review as helpful
+app.put("/api/reviews/:id/helpful", async (req, res) => {
+  try {
+    const review = await Review.findByIdAndUpdate(
+      req.params.id,
+      { $inc: { helpful: 1 } },
+      { new: true }
+    );
+    if (!review) {
+      return res.status(404).json({ message: "Không tìm thấy đánh giá." });
+    }
+    res.json(review);
+  } catch (error) {
+    console.error("Lỗi khi cập nhật hữu ích:", error);
+    res.status(500).json({ message: "Lỗi máy chủ" });
+  }
+});
+
+// Report a review
+app.post("/api/reviews/:id/report", async (req, res) => {
+  try {
+    const review = await Review.findByIdAndUpdate(
+      req.params.id,
+      { $inc: { reportCount: 1 } },
+      { new: true }
+    );
+    if (!review) {
+      return res.status(404).json({ message: "Không tìm thấy đánh giá." });
+    }
+    res.json({ message: "Đã báo cáo đánh giá thành công." });
+  } catch (error) {
+    console.error("Lỗi khi báo cáo đánh giá:", error);
     res.status(500).json({ message: "Lỗi máy chủ" });
   }
 });

@@ -22,6 +22,14 @@ const ReviewSchema = new mongoose.Schema({
     required: true,
     trim: true,
   },
+  helpful: {
+    type: Number,
+    default: 0,
+  },
+  reportCount: {
+    type: Number,
+    default: 0,
+  },
 }, { timestamps: true });
 
 // Ngăn một người dùng đánh giá một sản phẩm nhiều lần
