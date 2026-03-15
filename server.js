@@ -1403,10 +1403,38 @@ app.put("/api/orders/:id/status", async (req, res) => {
 
 // == User Management Routes (Admin Only) ==
 
-// GET all users
+// GET all users (with optional date filtering)
 app.get("/api/users", verifyAdmin, async (req, res) => {
   try {
-    const users = await User.find({}, "-password"); // Lấy tất cả user, bỏ trường password
+    const { year, month, day } = req.query;
+    let query = {};
+
+    if (year || month || day) {
+      const startDate = new Date();
+      const endDate = new Date();
+
+      if (year) {
+        startDate.setFullYear(parseInt(year), 0, 1);
+        startDate.setHours(0, 0, 0, 0);
+        endDate.setFullYear(parseInt(year), 11, 31);
+        endDate.setHours(23, 59, 59, 999);
+      }
+
+      if (month) {
+        const m = parseInt(month) - 1;
+        startDate.setMonth(m, 1);
+        endDate.setMonth(m + 1, 0); // Last day of that month
+      }
+
+      if (day) {
+        startDate.setDate(parseInt(day));
+        endDate.setDate(parseInt(day));
+      }
+
+      query.createdAt = { $gte: startDate, $lte: endDate };
+    }
+
+    const users = await User.find(query, "-password").sort({ createdAt: -1 });
     res.json(users);
   } catch (error) {
     console.error("Lỗi khi lấy danh sách người dùng:", error);
