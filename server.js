@@ -1403,33 +1403,27 @@ app.put("/api/orders/:id/status", async (req, res) => {
 
 // == User Management Routes (Admin Only) ==
 
-// GET all users (with optional date filtering)
+// GET all users (with optional date range filtering)
 app.get("/api/users", verifyAdmin, async (req, res) => {
   try {
-    const { year, month, day } = req.query;
+    const { startYear, endYear, startMonth, endMonth, startDay, endDay } = req.query;
     let query = {};
 
-    if (year || month || day) {
-      const startDate = new Date();
+    if (startYear || endYear || startMonth || endMonth || startDay || endDay) {
+      // Mặc định từ đầu năm 2024 đến hiện tại nếu không cung cấp cụ thể
+      const startDate = new Date(2024, 0, 1, 0, 0, 0, 0);
       const endDate = new Date();
+      endDate.setHours(23, 59, 59, 999);
 
-      if (year) {
-        startDate.setFullYear(parseInt(year), 0, 1);
-        startDate.setHours(0, 0, 0, 0);
-        endDate.setFullYear(parseInt(year), 11, 31);
-        endDate.setHours(23, 59, 59, 999);
-      }
+      if (startYear) startDate.setFullYear(parseInt(startYear));
+      if (startMonth) startDate.setMonth(parseInt(startMonth) - 1);
+      if (startDay) startDate.setDate(parseInt(startDay));
+      startDate.setHours(0, 0, 0, 0);
 
-      if (month) {
-        const m = parseInt(month) - 1;
-        startDate.setMonth(m, 1);
-        endDate.setMonth(m + 1, 0); // Last day of that month
-      }
-
-      if (day) {
-        startDate.setDate(parseInt(day));
-        endDate.setDate(parseInt(day));
-      }
+      if (endYear) endDate.setFullYear(parseInt(endYear));
+      if (endMonth) endDate.setMonth(parseInt(endMonth) - 1);
+      if (endDay) endDate.setDate(parseInt(endDay));
+      endDate.setHours(23, 59, 59, 999);
 
       query.createdAt = { $gte: startDate, $lte: endDate };
     }
