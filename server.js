@@ -1560,14 +1560,17 @@ app.post("/api/auth/google", async (req, res) => {
   try {
     const { token } = req.body;
 
-    // 1. Verify token với máy chủ Google
-    const ticket = await googleClient.verifyIdToken({
-      idToken: token,
-      audience: process.env.GOOGLE_CLIENT_ID,
+    // 1. Fetch user info using Access Token từ Google
+    const googleResponse = await fetch(`https://www.googleapis.com/oauth2/v3/userinfo`, {
+      headers: { Authorization: `Bearer ${token}` }
     });
+
+    if (!googleResponse.ok) {
+      throw new Error('Google token invalid or expired');
+    }
     
-    // Lấy thông tin user từ Ticket của Google
-    const payload = ticket.getPayload();
+    // Lấy thông tin user từ Google
+    const payload = await googleResponse.json();
     const { sub: googleId, email, name, picture } = payload;
 
     // 2. Tìm User trong Database xem đã tồn tại chưa bằng Email
