@@ -14,6 +14,9 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 const NodeCache = require("node-cache");
 const bcrypt = require("bcryptjs"); // For password hashing
 const jwt = require("jsonwebtoken"); // For authentication tokens
+const helmet = require("helmet"); // Security headers
+const compression = require("compression"); // Response compression
+const morgan = require("morgan"); // HTTP request logging
 
 // --- Initialize Cache ---
 const myCache = new NodeCache({ stdTTL: 300, checkperiod: 120 }); // Cache for 5 minutes
@@ -28,6 +31,15 @@ const PORT = process.env.PORT || 4000;
 
 // --- Middlewares ---
 console.log(">>> SERVER: Setting up middleware...");
+
+// Security & Performance
+app.use(helmet()); 
+app.use(compression());
+
+// Logging (Only use 'dev' format in non-test environments or enable for production)
+if (process.env.NODE_ENV !== 'test') {
+  app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+}
 app.use(cors({
   origin: [
     'http://localhost:5173',
@@ -324,7 +336,7 @@ app.get("/api/games/find", async (req, res) => {
   }
 });
 
-// 3. GET Search Games - Moved UP (Using simplified regex for now)
+// 3. GET Search Games
 app.get("/api/games/search", async (req, res) => {
   console.log(">>> SEARCH ROUTE HIT <<<");
   try {
@@ -336,27 +348,22 @@ app.get("/api/games/search", async (req, res) => {
       return res.status(400).json({ message: "Search query is required" });
     }
 
-    console.log(`Attempting SIMPLE MongoDB find for: "${query}"`);
-
-    // Switched back to $text search (requires text index)
-    console.log(`Attempting MongoDB $text search for: "${query}"`);
-    const games = await Game.find(
-      { $text: { $search: query } },
-      { score: { $meta: "textScore" } }
-    )
-      .sort({ score: { $meta: "textScore" } })
-      .limit(10);
+    console.log(`Attempting MongoDB regex search for: "${query}"`);
+    
+    // Use regex for case-insensitive partial matching
+    const searchRegex = new RegExp(query, 'i');
+    const games = await Game.find({
+      $or: [
+        { name: searchRegex },
+        { description: searchRegex },
+        { genre: searchRegex }
+      ]
+    }).limit(10);
 
     console.log(`MongoDB find completed. Found ${games.length} games.`);
     res.json(games);
   } catch (error) {
     console.error("!!! DETAILED SEARCH ERROR:", error);
-    if (error.message && error.message.includes("text index required")) {
-      return res.status(500).json({
-        message:
-          "Lỗi server: Cần tạo text index trong MongoDB (trên 'name' và 'description') để dùng $text search.",
-      });
-    }
     res.status(500).json({ message: "Lỗi máy chủ khi tìm kiếm game." });
   }
 });
@@ -2216,6 +2223,15 @@ app.post("/api/discounts/validate", async (req, res) => {
 });
 
 // =========================================================
+
+// --- Global Error Handling Middleware ---
+app.use((err, req, res, next) => {
+  console.error("🔥 [Global Error]:", err.stack);
+  res.status(err.status || 500).json({
+    message: err.message || "Lỗi máy chủ nội bộ. Vui lòng thử lại sau.",
+    stack: process.env.NODE_ENV === 'production' ? null : err.stack
+  });
+});
 
 // --- Start Server ---
 const server = app.listen(PORT, () => {
