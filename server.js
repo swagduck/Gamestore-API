@@ -17,6 +17,10 @@ const jwt = require("jsonwebtoken"); // For authentication tokens
 const helmet = require("helmet"); // Security headers
 const compression = require("compression"); // Response compression
 const morgan = require("morgan"); // HTTP request logging
+const { OAuth2Client } = require('google-auth-library'); // Google OAuth SDK
+
+// --- Initialize Google OAuth Client ---
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // --- Initialize Cache ---
 const myCache = new NodeCache({ stdTTL: 300, checkperiod: 120 }); // Cache for 5 minutes
@@ -1546,6 +1550,67 @@ app.post("/api/auth/login", async (req, res) => {
   } catch (error) {
     console.error("Lỗi đăng nhập:", error);
     res.status(500).json({ message: "Lỗi máy chủ khi đăng nhập." });
+  }
+});
+
+// ==========================================
+// THÊM: ROUTE ĐĂNG NHẬP BẰNG GOOGLE (OAUTH2)
+// ==========================================
+app.post("/api/auth/google", async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    // 1. Verify token với máy chủ Google
+    const ticket = await googleClient.verifyIdToken({
+      idToken: token,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    
+    // Lấy thông tin user từ Ticket của Google
+    const payload = ticket.getPayload();
+    const { sub: googleId, email, name, picture } = payload;
+
+    // 2. Tìm User trong Database xem đã tồn tại chưa bằng Email
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      // Nếu chưa có, Tự động Đăng ký (Tạo User Mới)
+      const randomPassword = await bcrypt.hash(Math.random().toString(36).slice(-8) + Date.now().toString(), 10);
+      user = new User({
+        name: name,
+        email: email,
+        password: randomPassword, // Generate a random impossible hash
+        googleId: googleId,
+        isAdmin: false
+      });
+      await user.save();
+      console.log(`[Google Auth]: Created new user for ${email}`);
+    } else {
+      // Nếu đã có, Cập nhật googleId nếu bị thiếu
+      if (!user.googleId) {
+        user.googleId = googleId;
+        await user.save();
+      }
+      console.log(`[Google Auth]: Logged in existing user ${email}`);
+    }
+
+    // 3. Tạo Custom Gamestore JWT Token cho frontend
+    const gamestoreToken = jwt.sign(
+      { userId: user._id, email: user.email, isAdmin: user.isAdmin },
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" }
+    );
+
+    // Trả về giống y hệt lúc login thông thường
+    res.json({
+      message: "Đăng nhập bằng Google thành công!",
+      token: gamestoreToken,
+      user: { id: user._id, email: user.email, isAdmin: user.isAdmin, name: user.name, avatar: picture },
+    });
+
+  } catch (error) {
+    console.error("Lỗi xác thực Google:", error);
+    res.status(401).json({ message: "Xác thực Google thất bại. Token không hợp lệ hoặc đã hết hạn." });
   }
 });
 

@@ -18,7 +18,17 @@ const UserSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
-    // Bạn có thể thêm các trường khác sau này (ví dụ: name, address, ...)
+    googleId: {
+      type: String,
+      unique: true,
+      sparse: true // Allows multiple nulls for users without Google accounts
+    },
+    name: {
+      type: String
+    },
+    avatar: {
+      type: String
+    }
   },
   { timestamps: true }
 ); // Tự động thêm createdAt và updatedAt
