@@ -1433,10 +1433,11 @@ app.get("/api/admin/ai-summary", verifyAdmin, async (req, res) => {
 
     const systemPrompt = `Bạn là Chuyên gia Phân tích Kinh doanh AI của Gam34Pers. 
 NHIỆM VỤ: Dựa trên dữ liệu doanh thu, hãy viết một bản tóm tắt tình hình kinh doanh "CÓ TÂM" cho chủ shop.
-- Đánh giá nhanh tình hình (tốt/xấu).
-- Chỉ ra điểm sáng (game bán chạy).
-- Đưa ra 1 lời khuyên marketing hoặc nhập hàng thực tế.
-TRÌNH BÀY: Ngắn gọn, súc tích (khoảng 3-4 câu), dùng emoji chuyên nghiệp.`;
+YÊU CẦU ĐỊNH DẠNG: 
+- Sử dụng xuống dòng (\n) giữa các phần để dễ đọc.
+- Cấu trúc gồm 3 phần rõ rệt: Đánh giá (📊), Điểm sáng (🚀), và Lời khuyên (💡).
+- Ngôn ngữ chuyên nghiệp, súc tích, dùng emoji phù hợp.
+TRÌNH BÀY: Khoảng 4-5 dòng, mỗi phần một dòng riêng biệt.`;
 
     // 4. Gọi AI với logic phòng vệ (Retry/Error Handling)
     try {
