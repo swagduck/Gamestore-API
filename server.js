@@ -1161,26 +1161,58 @@ app.post("/api/chat", checkRateLimit, async (req, res) => {
   try {
     const { message, history } = req.body;
     
-    // Nâng cấp System Prompt để AI làm việc chuyên nghiệp hơn
-    const systemPrompt = `Bạn là GameBot 🤖 - trợ lý thông minh của cửa hàng Gam34Pers.
-NHIỆM VỤ: Gợi ý game dựa trên sở thích khách hàng.
+    // 1. Lấy thông tin user (tùy chọn) để cá nhân hóa
+    let userContext = "Khách vãng lai";
+    let ownedGamesList = "";
+    
+    const token = req.headers.authorization?.split(" ")[1];
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const user = await User.findById(decoded.userId);
+        if (user) {
+          userContext = `Tên: ${user.name || 'Người dùng'}, Email: ${user.email}`;
+          
+          // Lấy danh sách game đã mua để tư vấn chuẩn hơn
+          const userOrders = await Order.find({ user: user._id, status: 'completed' });
+          const ownedSet = new Set();
+          userOrders.forEach(order => {
+            order.items.forEach(item => ownedSet.add(item.name));
+          });
+          if (ownedSet.size > 0) {
+            ownedGamesList = `Người dùng này đã sở hữu: ${Array.from(ownedSet).join(", ")}. Đừng gợi ý lại những game này trừ khi họ hỏi.`;
+          }
+        }
+      } catch (e) {
+        // Token lỗi thì thôi
+      }
+    }
 
-THỂ LOẠI TRONG DATABASE (DÙNG ĐÚNG TÊN NÀY): Kinh dị, Hành động, Nhập vai, Phiêu lưu, Mô phỏng, Chiến thuật, Thể thao, Đua xe, Indie.
-NỀN TẢNG: PC, PlayStation 5, Xbox Series X, Nintendo Switch.
+    // 2. Lấy "Kiến thức nền" (Top 15 game) để AI biết tư vấn sâu
+    const topGames = await Game.find({}).sort({ rating: -1, viewCount: -1 }).limit(15);
+    const gamesKnowledge = topGames.map(g => 
+      `- ${g.name}: [Thể loại: ${g.genre.join(", ")}], [Giá: $${g.price}], [Đánh giá: ${g.rating}/5], Mô tả: ${g.description.substring(0, 100)}...`
+    ).join("\n");
 
-FORMAT BẮT BUỘC (CHỈ JSON):
+    // 3. Nâng cấp System Prompt
+    const systemPrompt = `Bạn là GameBot 🤖 - Chuyên gia tư vấn game cao cấp của Gam34Pers.
+NHIỆM VỤ: Phân tích nhu cầu, so sánh game và đưa ra lời khuyên "CÓ GU" cho khách hàng. Đừng chỉ là một thanh tìm kiếm!
+
+THÔNG TIN NGƯỜI DÙNG HIỆN TẠI:
+- Trạng thái: ${userContext}
+- ${ownedGamesList}
+
+KIẾN THỨC VỀ CÁC GAME TRONG CỬA HÀNG (Dùng để tư vấn & so sánh):
+${gamesKnowledge}
+
+QUY TẮC PHẢN HỒI (CHỈ TRẢ VỀ JSON):
 {
-  "response": "Câu trả lời tiếng Việt thân thiện, có emoji",
-  "query": { 
-    "genre": "Tên thể loại TIẾNG VIỆT (Ví dụ: 'Kinh dị', 'Hành động')", 
-    "platform": "Nền tảng chuẩn (Ví dụ: 'PC', 'PS5')", 
-    "name": "tên game" 
-  }
+  "response": "Lời tư vấn tiếng Việt sâu sắc, thân thiện. Hãy biết so sánh game, nhắc đến ưu điểm của các game bạn biết ở trên. Có thể chào tên người dùng nếu có.",
+  "query": { "genre": "thể loại tiếng Việt", "platform": "PC/PS5/Xbox/Switch", "name": "tên game" }
 }
-LUÔN TRẢ VỀ JSON.`;
+LUÔN TRẢ VỀ JSON. Nếu chỉ là tư vấn/so sánh, 'query' có thể để rỗng {}.`;
 
     if (!process.env.GEMINI_API_KEY) {
-      console.error('❌ GEMINI_API_KEY missing');
       return res.status(500).json({ text: "AI service not configured" });
     }
 
@@ -1188,7 +1220,6 @@ LUÔN TRẢ VỀ JSON.`;
       .filter(m => m.id !== 1)
       .map(m => ({ role: m.from === "user" ? "user" : "model", parts: [{ text: m.text }] }));
 
-    // Đảm bảo tin nhắn đầu tiên Luôn là 'user'
     const firstUserIdx = formattedHistory.findIndex(msg => msg.role === 'user');
     if (firstUserIdx !== -1) {
       formattedHistory = formattedHistory.slice(firstUserIdx);
@@ -1196,7 +1227,6 @@ LUÔN TRẢ VỀ JSON.`;
       formattedHistory = [];
     }
 
-    // Lấy tối đa 10 tin nhắn cuối nhưng vẫn phải đảm bảo bắt đầu bằng 'user'
     formattedHistory = formattedHistory.slice(-10);
     while (formattedHistory.length > 0 && formattedHistory[0].role !== 'user') {
       formattedHistory.shift();
@@ -1212,7 +1242,6 @@ LUÔN TRẢ VỀ JSON.`;
 
     let aiJson;
     try {
-      // Bóc tách JSON an toàn hơn bằng Regex
       const jsonMatch = aiResponseText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
          aiJson = JSON.parse(jsonMatch[0]);
@@ -1228,7 +1257,6 @@ LUÔN TRẢ VỀ JSON.`;
 
     let gameResults = [];
     if (aiJson.query && (aiJson.query.genre || aiJson.query.platform || aiJson.query.name)) {
-      // Tìm kiếm game linh hoạt hơn
       const dbQuery = {};
       if (aiJson.query.genre) dbQuery.genre = { $regex: new RegExp(aiJson.query.genre, "i") };
       if (aiJson.query.platform) dbQuery.platform = { $regex: new RegExp(aiJson.query.platform, "i") };
@@ -1243,7 +1271,7 @@ LUÔN TRẢ VỀ JSON.`;
     });
   } catch (error) {
     console.error('❌ Chatbot Error:', error.message);
-    res.status(500).json({ text: "Hệ thống AI đang bận, bạn thử lại sau nhen! 🤖" });
+    res.status(500).json({ text: "Hệ thống AI đang bận chút, bạn thử lại sau nhen! 🤖" });
   }
 });
 
