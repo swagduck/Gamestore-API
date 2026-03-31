@@ -1403,6 +1403,56 @@ app.get("/api/admin/orders", verifyAdmin, async (req, res) => {
   }
 });
 
+// == Admin: AI Summary Insight ==
+app.get("/api/admin/ai-summary", verifyAdmin, async (req, res) => {
+  try {
+    // 1. Thu thập dữ liệu thô
+    const completedOrders = await Order.find({ status: 'completed' }).populate('items.game');
+    const totalRevenue = completedOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+    const totalOrders = completedOrders.length;
+    
+    // Thống kê game
+    const gameSales = {};
+    completedOrders.forEach(o => {
+      o.items.forEach(item => {
+        const name = item.name || 'Unknown';
+        gameSales[name] = (gameSales[name] || 0) + (item.finalPrice || 1);
+      });
+    });
+    
+    // Lấy top 5 game doanh thu cao
+    const topGames = Object.entries(gameSales)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([name, rev]) => `${name} ($${rev.toFixed(2)})`)
+      .join(", ");
+
+    const analyticsData = `
+      - Tổng doanh thu: $${totalRevenue.toFixed(2)}
+      - Tổng đơn hàng: ${totalOrders}
+      - Top game doanh thu: ${topGames}
+    `;
+
+    const systemPrompt = `Bạn là Chuyên gia Phân tích Kinh doanh AI của Gam34Pers. 
+NHIỆM VỤ: Dựa trên dữ liệu doanh thu, hãy viết một bản tóm tắt tình hình kinh doanh "CÓ TÂM" cho chủ shop.
+- Đánh giá nhanh tình hình (tốt/xấu).
+- Chỉ ra điểm sáng (game bán chạy).
+- Đưa ra 1 lời khuyên marketing hoặc nhập hàng thực tế.
+TRÌNH BÀY: Ngắn gọn, súc tích (khoảng 3-4 câu), dùng emoji chuyên nghiệp.`;
+
+    const result = await chatModelGlobal.generateContent([
+      { text: systemPrompt },
+      { text: `Dữ liệu hôm nay: ${analyticsData}` }
+    ]);
+    
+    const summary = result.response.text();
+    res.json({ summary });
+  } catch (error) {
+    console.error("Lỗi AI Summary:", error);
+    res.status(500).json({ summary: "AI đang bận phân tích số liệu, vui lòng quay lại sau! 📉" });
+  }
+});
+
 // == Admin: Revenue stats ==
 app.get("/api/admin/stats", verifyAdmin, async (req, res) => {
   try {
