@@ -64,7 +64,8 @@ app.use(cors({
     'https://my-ecommerce-3rku918l9-swagducks-projects.vercel.app',
     'https://my-ecommerce-mdzgyhhog-swagducks-projects.vercel.app'
   ],
-  credentials: true
+  credentials: true,
+  maxAge: 86400 // Cache CORS preflight for 24 hours
 }));
 console.log(">>> SERVER: CORS middleware applied with specific origins.");
 app.use(express.json({ limit: '10mb' }));
@@ -299,6 +300,13 @@ app.get("/api/games", async (req, res) => {
 
     const { limit, sort, order = "desc" } = req.query;
 
+    const cacheKey = `games_${limit || 'all'}_${sort || 'none'}_${order}`;
+    const cachedData = myCache.get(cacheKey);
+    if (cachedData) {
+      // console.log(`🚀 [Cache Hit] /api/games - ${cacheKey}`);
+      return res.json(cachedData);
+    }
+
     let query = Game.find();
 
     if (sort) {
@@ -312,6 +320,7 @@ app.get("/api/games", async (req, res) => {
     }
 
     const games = await query.exec();
+    myCache.set(cacheKey, games); // Lưu vào cache
     res.json(games);
   } catch (err) {
     console.log("Lỗi server /api/games:", err.message);
@@ -411,9 +420,17 @@ app.get("/api/games/discounted", async (req, res) => {
 // GET all reviews for a game
 app.get("/api/games/:id/reviews", async (req, res) => {
   try {
+    const cacheKey = `reviews_${req.params.id}`;
+    const cachedData = myCache.get(cacheKey);
+    if (cachedData) {
+      return res.json(cachedData);
+    }
+
     const reviews = await Review.find({ game: req.params.id })
       .populate("user", "email")
       .sort({ createdAt: -1 });
+
+    myCache.set(cacheKey, reviews);
     res.json(reviews);
   } catch (error) {
     console.error("Lỗi khi lấy đánh giá:", error);
@@ -497,6 +514,9 @@ app.post("/api/games/:id/reviews", verifyToken, async (req, res) => {
       reviews.reduce((acc, item) => item.rating + acc, 0) / reviews.length;
 
     await game.save();
+
+    // Xóa cache đánh giá để user thấy cái mới ngay
+    myCache.del(`reviews_${gameId}`);
 
     res.status(review.isNew ? 201 : 200).json({ 
       message: review.isNew ? "Cảm ơn bạn đã đánh giá!" : "Đã cập nhật đánh giá của bạn!",
