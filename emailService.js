@@ -35,7 +35,7 @@ const buildOrderEmailHTML = (order, userEmail) => {
     hour: '2-digit', minute: '2-digit',
   });
 
-  const frontendUrl = process.env.FRONTEND_URL || 'https://my-ecommerce-app-red.vercel.app';
+  const frontendBase = (process.env.FRONTEND_URL || 'https://my-ecommerce-app-red.vercel.app').replace(/\/$/, "");
 
   return `<!DOCTYPE html>
 <html lang="vi">
@@ -93,7 +93,7 @@ const buildOrderEmailHTML = (order, userEmail) => {
 
         <!-- CTA Button -->
         <div style="text-align:center;margin:28px 0 12px;">
-          <a href="${frontendUrl}/orders"
+          <a href="${frontendBase}/orders"
              style="display:inline-block;background:linear-gradient(135deg,#646cff,#a855f7);color:white;text-decoration:none;font-weight:700;font-size:15px;padding:14px 36px;border-radius:30px;box-shadow:0 4px 20px rgba(100,108,255,0.4);">
             Xem lịch sử đơn hàng →
           </a>
