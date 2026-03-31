@@ -20,6 +20,8 @@ const morgan = require("morgan");
 const { OAuth2Client } = require('google-auth-library');
 const { sendOrderConfirmation } = require('./emailService');
 
+console.log('🚀 BACKEND STARTING... EMAIL_USER is:', process.env.EMAIL_USER ? 'CONFIGURED' : 'MISSING');
+
 // --- Initialize Google OAuth Client ---
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -247,6 +249,55 @@ app.get("/api/test", (req, res) => {
     mongoUriSet: !!process.env.MONGO_URI,
     port: process.env.PORT || 4000
   });
+});
+
+// == MANUAL EMAIL TEST ROUTE ==
+app.get("/api/test-email-now", async (req, res) => {
+  console.log("=== [MANUAL TEST] Endpoint /api/test-email-now hit ===");
+  try {
+    const email = req.query.email || process.env.EMAIL_USER;
+    if (!email) return res.status(400).send("Lỗi: Không tìm thấy email để gửi. Thêm ?email=xxx@gmail.com vào URL.");
+    
+    console.log(`📡 Attempting to send test email to: ${email}`);
+    
+    const testOrder = {
+      orderNumber: "TEST-CMD-999",
+      items: [{ name: "Game Debug Test", finalPrice: 0, price: 0, image: "", quantity: 1 }],
+      totalAmount: 0,
+      createdAt: new Date()
+    };
+
+    await sendOrderConfirmation(email, testOrder);
+    res.send(`✅ Lệnh gửi mail đã được phát đi tới ${email}. Kiểm tra Log Render và Inbox/Spam!`);
+  } catch (err) {
+    console.error("❌ Lỗi trong route test-email-now:", err);
+    res.status(500).send("Lỗi Server: " + err.message);
+  }
+});
+
+
+// == MANUAL EMAIL TEST ROUTE ==
+app.get("/api/test-email-now", async (req, res) => {
+  console.log("=== [MANUAL TEST] Endpoint /api/test-email-now hit ===");
+  try {
+    const email = req.query.email || process.env.EMAIL_USER;
+    if (!email) return res.status(400).send("Lỗi: Không tìm thấy email để gửi. Thêm ?email=xxx@gmail.com vào URL.");
+    
+    console.log(`📡 Attempting to send test email to: ${email}`);
+    
+    const testOrder = {
+      orderNumber: "TEST-CMD-999",
+      items: [{ name: "Game Debug Test", finalPrice: 0, price: 0, image: "", quantity: 1 }],
+      totalAmount: 0,
+      createdAt: new Date()
+    };
+
+    await sendOrderConfirmation(email, testOrder);
+    res.send(`✅ Lệnh gửi mail đã được phát đi tới ${email}. Kiểm tra Log Render và Inbox/Spam!`);
+  } catch (err) {
+    console.error("❌ Lỗi trong route test-email-now:", err);
+    res.status(500).send("Lỗi Server: " + err.message);
+  }
 });
 
 // == Database Status Route ==

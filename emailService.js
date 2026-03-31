@@ -1,5 +1,9 @@
 const nodemailer = require('nodemailer');
 
+console.log('📬 [EmailService] Module loading...');
+console.log('📬 [EmailService] Target User:', process.env.EMAIL_USER || 'NOT SET');
+console.log('📬 [EmailService] Password Length:', process.env.EMAIL_APP_PASSWORD ? process.env.EMAIL_APP_PASSWORD.replace(/\s/g, '').length : 0);
+
 // --- Transporter Setup ---
 const transporter = nodemailer.createTransport({
   service: 'gmail',
