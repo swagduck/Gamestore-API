@@ -32,8 +32,8 @@ const myCache = new NodeCache({ stdTTL: 300, checkperiod: 120 }); // Cache for 5
 const geminiKey = (process.env.GEMINI_API_KEY || "").trim();
 console.log(`🤖 AI INIT: Key prefix: ${geminiKey.substring(0, 7)}... suffix: ...${geminiKey.substring(geminiKey.length - 4)} (Length: ${geminiKey.length})`);
 const genAI = new GoogleGenerativeAI(geminiKey);
-// Use the latest Gemini 3.1 model as per Google's migration notice
-const chatModelGlobal = genAI.getGenerativeModel({ model: "gemini-3.1-flash-lite" });
+// Use the most stable model currently available
+const chatModelGlobal = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 const app = express();
 const PORT = process.env.PORT || 4000;
