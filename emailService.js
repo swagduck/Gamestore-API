@@ -14,14 +14,15 @@ console.log('📬 [EmailService] Password Length:', process.env.EMAIL_APP_PASSWO
 // Using explicit host/port instead of 'service: gmail' to have more control
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
-  port: 465,
-  secure: true, // Use SSL/TLS
+  port: 587,
+  secure: false, // Use STARTTLS (False for 587, True for 465)
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_APP_PASSWORD, // Gmail App Password (16 chars)
   },
-  // Add direct connection timeout
-  connectionTimeout: 10000, 
+  // Higher timeout for cloud environments
+  connectionTimeout: 20000, 
+  greetingTimeout: 20000,
 });
 
 // Verify connection configuration
