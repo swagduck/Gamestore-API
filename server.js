@@ -31,7 +31,7 @@ const myCache = new NodeCache({ stdTTL: 300, checkperiod: 120 }); // Cache for 5
 // --- Initialize Google AI ---
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 // Use the consistent model name throughout
-const chatModelGlobal = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+const chatModelGlobal = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
 
 const app = express();
 const PORT = process.env.PORT || 4000;
