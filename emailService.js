@@ -1,16 +1,27 @@
 const nodemailer = require('nodemailer');
+const dns = require('dns');
+
+// Force IPv4 prioritize over IPv6 (Essential for Render/Cloud environments)
+if (dns.setDefaultResultOrder) {
+  dns.setDefaultResultOrder('ipv4first');
+}
 
 console.log('📬 [EmailService] Module loading...');
 console.log('📬 [EmailService] Target User:', process.env.EMAIL_USER || 'NOT SET');
 console.log('📬 [EmailService] Password Length:', process.env.EMAIL_APP_PASSWORD ? process.env.EMAIL_APP_PASSWORD.replace(/\s/g, '').length : 0);
 
 // --- Transporter Setup ---
+// Using explicit host/port instead of 'service: gmail' to have more control
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 465,
+  secure: true, // Use SSL/TLS
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_APP_PASSWORD, // Gmail App Password (16 chars)
   },
+  // Add direct connection timeout
+  connectionTimeout: 10000, 
 });
 
 // Verify connection configuration
