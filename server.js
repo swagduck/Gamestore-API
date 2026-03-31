@@ -1184,11 +1184,26 @@ LUÔN TRẢ VỀ JSON.`;
       return res.status(500).json({ text: "AI service not configured" });
     }
 
+    let formattedHistory = (history || [])
+      .filter(m => m.id !== 1)
+      .map(m => ({ role: m.from === "user" ? "user" : "model", parts: [{ text: m.text }] }));
+
+    // Đảm bảo tin nhắn đầu tiên Luôn là 'user'
+    const firstUserIdx = formattedHistory.findIndex(msg => msg.role === 'user');
+    if (firstUserIdx !== -1) {
+      formattedHistory = formattedHistory.slice(firstUserIdx);
+    } else {
+      formattedHistory = [];
+    }
+
+    // Lấy tối đa 10 tin nhắn cuối nhưng vẫn phải đảm bảo bắt đầu bằng 'user'
+    formattedHistory = formattedHistory.slice(-10);
+    while (formattedHistory.length > 0 && formattedHistory[0].role !== 'user') {
+      formattedHistory.shift();
+    }
+
     const chat = chatModelGlobal.startChat({
-      history: (history || [])
-        .filter(m => m.id !== 1)
-        .map(m => ({ role: m.from === "user" ? "user" : "model", parts: [{ text: m.text }] }))
-        .slice(-10),
+      history: formattedHistory,
       systemInstruction: { parts: [{ text: systemPrompt }] },
     });
 
