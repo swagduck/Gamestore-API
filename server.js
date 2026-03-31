@@ -20,7 +20,7 @@ const morgan = require("morgan");
 const { OAuth2Client } = require('google-auth-library');
 const { sendOrderConfirmation } = require('./emailService');
 
-console.log('🚀 BACKEND STARTING... EMAIL_USER is:', process.env.EMAIL_USER ? 'CONFIGURED' : 'MISSING');
+console.log('🚀 BACKEND STARTING... RESEND_API_KEY is:', process.env.RESEND_API_KEY ? 'CONFIGURED' : 'MISSING');
 
 // --- Initialize Google OAuth Client ---
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
