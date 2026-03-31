@@ -12,12 +12,13 @@ const Order = require("./Order.js"); // Order model for user purchase history
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const NodeCache = require("node-cache");
-const bcrypt = require("bcryptjs"); // For password hashing
-const jwt = require("jsonwebtoken"); // For authentication tokens
-const helmet = require("helmet"); // Security headers
-const compression = require("compression"); // Response compression
-const morgan = require("morgan"); // HTTP request logging
-const { OAuth2Client } = require('google-auth-library'); // Google OAuth SDK
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+const helmet = require("helmet");
+const compression = require("compression");
+const morgan = require("morgan");
+const { OAuth2Client } = require('google-auth-library');
+const { sendOrderConfirmation } = require('./emailService');
 
 // --- Initialize Google OAuth Client ---
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -742,6 +743,16 @@ app.post("/api/test-payment", verifyToken, async (req, res) => {
       
       await order.save();
       console.log(`✅ Test order created: ${order._id} for user ${userId}`);
+
+      // Send confirmation email (non-blocking)
+      try {
+        const userDoc = await User.findById(userId).select('email');
+        if (userDoc?.email) {
+          sendOrderConfirmation(userDoc.email, order);
+        }
+      } catch (emailErr) {
+        console.warn('Could not send test order email:', emailErr.message);
+      }
       
     } catch (orderError) {
       console.error('Error creating test order:', orderError);
@@ -947,6 +958,16 @@ app.post("/api/orders/create-from-session", verifyToken, async (req, res) => {
     
     // Update analytics
     await syncAnalytics(order);
+
+    // Send confirmation email (non-blocking)
+    try {
+      const userDoc = await User.findById(userId).select('email');
+      if (userDoc?.email) {
+        sendOrderConfirmation(userDoc.email, order);
+      }
+    } catch (emailErr) {
+      console.warn('Could not fetch user email for confirmation:', emailErr.message);
+    }
     
     res.status(201).json(order);
   } catch (error) {
