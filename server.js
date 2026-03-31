@@ -29,7 +29,9 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const myCache = new NodeCache({ stdTTL: 300, checkperiod: 120 }); // Cache for 5 minutes
 
 // --- Initialize Google AI ---
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const geminiKey = (process.env.GEMINI_API_KEY || "").trim();
+console.log(`🤖 AI INIT: Key prefix: ${geminiKey.substring(0, 7)}... suffix: ...${geminiKey.substring(geminiKey.length - 4)} (Length: ${geminiKey.length})`);
+const genAI = new GoogleGenerativeAI(geminiKey);
 // Use the most compatible model name
 const chatModelGlobal = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
