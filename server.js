@@ -852,12 +852,15 @@ app.post("/api/create-checkout-session", verifyToken, async (req, res) => {
         quantity: item.quantity,
       };
     });
+    // Clean FRONTEND_URL by removing trailing slash if it exists
+    const frontendBase = (process.env.FRONTEND_URL || "http://localhost:5173").replace(/\/$/, "");
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       line_items: line_items,
       mode: "payment",
-      success_url: process.env.FRONTEND_URL + "/success?session_id={CHECKOUT_SESSION_ID}", // Your success page URL
-      cancel_url: process.env.FRONTEND_URL + "/cancel", // Your cancel page URL
+      success_url: `${frontendBase}/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${frontendBase}/cancel`,
       metadata: {
         userId: req.user?._id?.toString() || 'guest' // Include user ID in metadata
       },
