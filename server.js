@@ -32,8 +32,8 @@ const myCache = new NodeCache({ stdTTL: 300, checkperiod: 120 }); // Cache for 5
 const geminiKey = (process.env.GEMINI_API_KEY || "").trim();
 console.log(`🤖 AI INIT: Key prefix: ${geminiKey.substring(0, 7)}... suffix: ...${geminiKey.substring(geminiKey.length - 4)} (Length: ${geminiKey.length})`);
 const genAI = new GoogleGenerativeAI(geminiKey);
-// Upgrade to Gemini 3.1 for cutting-edge performance
-const chatModelGlobal = genAI.getGenerativeModel({ model: "gemini-3.1-flash-lite" });
+// Upgrade to Gemini 3.1 Preview for cutting-edge performance (v1beta requires -preview suffix)
+const chatModelGlobal = genAI.getGenerativeModel({ model: "gemini-3.1-flash-lite-preview" });
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -42,7 +42,10 @@ const PORT = process.env.PORT || 4000;
 console.log(">>> SERVER: Setting up middleware...");
 
 // Security & Performance
-app.use(helmet()); 
+app.use(helmet({
+  crossOriginOpenerPolicy: { policy: "unsafe-none" }, // Fixes window.closed/popup issues
+  contentSecurityPolicy: false, // Avoid blocking dynamic AI resources
+})); 
 app.use(compression());
 
 // Logging (Only use 'dev' format in non-test environments or enable for production)
