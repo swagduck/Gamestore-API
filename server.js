@@ -48,27 +48,21 @@ if (process.env.NODE_ENV !== 'test') {
   app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 }
 app.use(cors({
-  origin: [
-    'http://localhost:5173',
-    'http://localhost:5174',
-    'https://my-ecommerce-7unj4e1ps-swagducks-projects.vercel.app',
-    'https://my-ecommerce-app-red.vercel.app',
-    'https://my-ecommerce-ej2q51xzh-swagducks-projects.vercel.app',
-    'https://my-ecommerce-3mdxa4qep-swagducks-projects.vercel.app',
-    'https://my-ecommerce-ijvt7e7kl-swagducks-projects.vercel.app',
-    'https://my-ecommerce-ahkdafcwc-swagducks-projects.vercel.app',
-    'https://my-ecommerce-1cgddc1zl-swagducks-projects.vercel.app',
-    'https://my-ecommerce-j53i8rvb3-swagducks-projects.vercel.app',
-    'https://my-ecommerce-mwav2gsgx-swagducks-projects.vercel.app',
-    'https://my-ecommerce-qxf9s05no-swagducks-projects.vercel.app',
-    'https://my-ecommerce-bm4zando6-swagducks-projects.vercel.app',
-    'https://my-ecommerce-l6qx27hyb-swagducks-projects.vercel.app',
-    'https://my-ecommerce-3zubgbbde-swagducks-projects.vercel.app',
-    'https://my-ecommerce-3rku918l9-swagducks-projects.vercel.app',
-    'https://my-ecommerce-mdzgyhhog-swagducks-projects.vercel.app'
-  ],
+  origin: function (origin, callback) {
+    const allowed = [
+      'http://localhost:5173',
+      'http://localhost:5174',
+      'https://my-ecommerce-app-red.vercel.app'
+    ];
+    // Allow if origin is in whitelist or if it contains vercel.app
+    if (!origin || allowed.indexOf(origin) !== -1 || origin.includes('vercel.app')) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
-  maxAge: 86400 // Cache CORS preflight for 24 hours
+  maxAge: 86400
 }));
 console.log(">>> SERVER: CORS middleware applied with specific origins.");
 app.use(express.json({ limit: '10mb' }));
