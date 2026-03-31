@@ -30,8 +30,8 @@ const myCache = new NodeCache({ stdTTL: 300, checkperiod: 120 }); // Cache for 5
 
 // --- Initialize Google AI ---
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-// Use the consistent model name throughout
-const chatModelGlobal = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+// Use the most compatible model name
+const chatModelGlobal = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -1447,15 +1447,15 @@ TRÌNH BÀY: Ngắn gọn, súc tích (khoảng 3-4 câu), dùng emoji chuyên n
       const summary = result.response.text();
       res.json({ summary });
     } catch (aiError) {
-      if (aiError.status === 503 || aiError.message.includes("503")) {
+      if (aiError.status === 503 || aiError.message?.includes("503")) {
         console.warn("⚠️ Gemini busy (503)");
-        return res.status(503).json({ summary: "🔮 AI Gemini đang quá tải lượt gọi (Dưới 10 lượt/phút cho gói Free). Bạn hãy thử lại sau ít phút nhé! ⌛" });
+        return res.status(503).json({ message: "🔮 AI Gemini hiện đang quá tải lượt gọi (Dưới 10 lượt/phút cho gói Free). Bạn hãy thử lại sau ít phút nhé! ⌛" });
       }
-      throw aiError; // Để catch ngoài xử lý lỗi 500 chung
+      throw aiError; 
     }
   } catch (error) {
     console.error("❌ Lỗi AI Summary:", error.message);
-    res.status(500).json({ summary: "AI đang bận phân tích số liệu, vui lòng quay lại sau! 📉" });
+    res.status(500).json({ message: "AI đang bận phân tích số liệu, vui lòng quay lại sau! 📉" });
   }
 });
 
