@@ -893,6 +893,14 @@ app.post("/api/orders/create-from-session", verifyToken, async (req, res) => {
     // Check if order already exists for this session
     const existingOrder = await Order.findOne({ paymentId: sessionId });
     if (existingOrder) {
+      // Even if order exists, try to send confirmation email if not sent yet
+      try {
+        const userDoc = await User.findById(userId).select('email');
+        if (userDoc?.email) {
+          sendOrderConfirmation(userDoc.email, existingOrder);
+        }
+      } catch (e) { console.error('Email retry failed'); }
+      
       return res.json(existingOrder); // Return existing order
     }
     
@@ -1051,6 +1059,16 @@ app.post("/api/stripe/webhook", async (req, res) => {
             const order = new Order(orderData);
             await order.save();
             console.log(`✅ Order created from webhook with ${orderItems.length} items for user ${userId}: ${order._id}`);
+
+            // Send confirmation email from webhook
+            try {
+              const userDoc = await User.findById(userId).select('email');
+              if (userDoc?.email) {
+                sendOrderConfirmation(userDoc.email, order);
+              }
+            } catch (emailErr) {
+              console.warn('Webhook email failed:', emailErr.message);
+            }
 
             // Update analytics
             await syncAnalytics(order);

@@ -9,6 +9,15 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+// Verify connection configuration
+transporter.verify(function (error, success) {
+  if (error) {
+    console.error('❌ Email transporter error:', error.message);
+  } else {
+    console.log('✅ Email server is ready to take our messages');
+  }
+});
+
 // --- Helper: Format currency ---
 const formatPrice = (price) => {
   if (price === 0) return '<span style="color:#43A047;font-weight:700;">MIỄN PHÍ</span>';
