@@ -46,7 +46,7 @@ const GameSchema = new mongoose.Schema({
 });
 
 // Thêm text index để tối ưu hóa tìm kiếm
-GameSchema.index({ name: "text", description: "text" });
+GameSchema.index({ name: "text", description: "text", genre: "text" });
 
 // Method to get final price (free or discounted)
 GameSchema.methods.getFinalPrice = function() {
