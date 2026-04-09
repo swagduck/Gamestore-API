@@ -17,6 +17,7 @@ const userRoutes = require('./src/routes/userRoutes');
 const analyticsRoutes = require('./src/routes/analyticsRoutes');
 const notificationRoutes = require('./src/routes/notificationRoutes');
 const discountRoutes = require('./src/routes/discountRoutes');
+const adminRoutes = require('./src/routes/adminRoutes');
 const gameController = require('./src/controllers/gameController'); // For recommendations
 
 const app = express();
@@ -83,6 +84,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/discounts", discountRoutes);
+app.use("/api/admin", adminRoutes);
 
 // Legacy explicit route for frontend compatibility
 app.post("/api/recommendations", gameController.getRecommendations);

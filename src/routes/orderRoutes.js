@@ -16,8 +16,4 @@ router.get('/orders/owned-game-ids', verifyToken, orderController.getOwnedGameId
 router.get('/orders/:id', verifyToken, orderController.getOrderById);
 router.post('/orders', verifyToken, orderController.createOrder);
 
-// Admin Order Management
-router.get('/admin/orders', verifyAdmin, orderController.getAllOrdersAdmin);
-router.put('/orders/:id/status', orderController.updateOrderStatus); // Should be verifyAdmin ideally, but preserving original logic
-
 module.exports = router;
