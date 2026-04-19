@@ -7,7 +7,10 @@ const jwt = require("jsonwebtoken");
 // Initialize Google AI
 const geminiKey = (process.env.GEMINI_API_KEY || "").trim();
 const genAI = new GoogleGenerativeAI(geminiKey);
-const chatModelGlobal = genAI.getGenerativeModel({ model: "gemini-3.1-flash-lite-preview" });
+const chatModelGlobal = genAI.getGenerativeModel({ 
+  model: "gemini-3.1-flash-lite-preview",
+  tools: [{ googleSearch: {} }]
+});
 
 const handleChat = async (req, res) => {
   try {
@@ -57,12 +60,17 @@ THÔNG TIN NGƯỜI DÙNG HIỆN TẠI:
 KIẾN THỨC VỀ CÁC GAME TRONG CỬA HÀNG (Dùng để tư vấn & so sánh):
 ${gamesKnowledge}
 
-QUY TẮC PHẢN HỒI (CHỈ TRẢ VỀ JSON):
+QUYỀN HẠN ĐẶC BIỆT (INTERNET ACCESS):
+- Nếu người dùng hỏi các chi tiết sâu (cốt truyện, gameplay cơ bản, nhà phát triển) hoặc hỏi về một TỰA GAME KHÔNG CÓ trong danh sách cửa hàng, BẠN BẮT BUỘC SỬ DỤNG GOOGLE SEARCH để lấy thông tin thực tế trên mạng và review cực kỳ chi tiết cho họ.
+
+QUY TẮC PHẢN HỒI (CHỈ TRẢ VỀ CHUẨN JSON):
+\`\`\`json
 {
-  "response": "BẮT BUỘC: Trình bày câu trả lời SIÊU ĐẸP bằng Markdown! Hãy dùng: \n- **Tiêu đề** (ví dụ: ### 🎮 Góc Tư Vấn)\n- **In đậm** tên game (**Elden Ring**)\n- **Gạch đầu dòng (-)** để liệt kê ưu điểm\n- **Nhiều Emoji** 🔥✨⚔️ để bài viết sinh động.\nKHÔNG viết thành một khối chữ dài, hãy chia thành các đoạn ngắn gọn, súc tích, dễ nhìn. Chào tên người dùng thân thiện.",
-  "query": { "genre": "thể loại tiếng Việt", "platform": "PC/PS5/Xbox/Switch", "name": "tên game" }
+  "response": "Trình bày câu trả lời SIÊU ĐẸP bằng Markdown! Dùng: \n- **Tiêu đề** (ví dụ: ### 🎮 Góc Tư Vấn)\n- **In đậm** tên game (**Elden Ring**)\n- **Gạch đầu dòng (-)** liệt kê cốt truyện/ưu điểm\n- **Nhiều Emoji** 🔥✨⚔️.\nChia đoạn ngắn gọn, dễ nhìn.",
+  "query": { "genre": "thể loại", "platform": "PC", "name": "tên game" }
 }
-LUÔN TRẢ VỀ JSON. Nếu chỉ là tư vấn/so sánh, 'query' có thể để rỗng {}.`;
+\`\`\`
+LUÔN TRẢ VỀ JSON HỢP LỆ! TUYỆT ĐỐI KHÔNG xuất kết quả tìm kiếm Google ra ngoài khối JSON. Mọi thông tin (kể cả kết quả từ mạng) phải được nhét gọn đẹp vào bên trong biến "response". Không comment ngoài JSON.`;
 
     if (!process.env.GEMINI_API_KEY) {
       return res.status(500).json({ text: "AI service not configured" });
