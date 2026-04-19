@@ -40,9 +40,14 @@ app.use(cors({
   origin: function (origin, callback) {
     const allowed = [
       'http://localhost:5173',
-      'http://localhost:5174',
-      'https://my-ecommerce-app-red.vercel.app'
+      'http://localhost:5174'
     ];
+    
+    // Đổ biến môi trường vào mảng allowed nếu có
+    if (process.env.FRONTEND_URL && !allowed.includes(process.env.FRONTEND_URL)) {
+      allowed.push(process.env.FRONTEND_URL);
+    }
+
     if (!origin || allowed.indexOf(origin) !== -1 || origin.includes('vercel.app')) {
       callback(null, true);
     } else {
