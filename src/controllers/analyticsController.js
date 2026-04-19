@@ -176,32 +176,51 @@ const getAiSummary = async (req, res) => {
     const completedOrders = await Order.find({ status: 'completed' }).populate('items.game');
     const totalRevenue = completedOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
     const totalOrders = completedOrders.length;
+    const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
     
     const gameSales = {};
+    const gameSalesCount = {};
     completedOrders.forEach(o => {
       o.items.forEach(item => {
         const name = item.name || 'Unknown';
         gameSales[name] = (gameSales[name] || 0) + (item.finalPrice || 1);
+        gameSalesCount[name] = (gameSalesCount[name] || 0) + (item.quantity || 1);
       });
     });
     
-    const topGames = Object.entries(gameSales)
-      .sort((a, b) => b[1] - a[1]).slice(0, 5)
+    const topGamesRev = Object.entries(gameSales)
+      .sort((a, b) => b[1] - a[1]).slice(0, 3)
       .map(([name, rev]) => `${name} ($${rev.toFixed(2)})`).join(", ");
+
+    const gamesData = await Game.find({}).select('name viewCount price');
+    const topViewedGames = gamesData
+      .sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0)).slice(0, 3)
+      .map(g => `${g.name} (${g.viewCount} views)`).join(", ");
+      
+    const slowMoving = gamesData
+      .filter(g => (g.viewCount || 0) > 5 && !gameSalesCount[g.name])
+      .sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0)).slice(0, 3)
+      .map(g => g.name).join(", ");
 
     const analyticsData = `
       - Tổng doanh thu: $${(totalRevenue || 0).toFixed(2)}
-      - Tổng đơn hàng: ${totalOrders || 0}
-      - Top game doanh thu: ${topGames || 'Chưa có dữ liệu'}
+      - Số đơn hàng: ${totalOrders || 0}
+      - Giá trị trung bình/đơn (AOV): $${avgOrderValue.toFixed(2)}
+      - Top bán chạy (Doanh thu): ${topGamesRev || 'Chưa có'}
+      - Top xem nhiều nhất: ${topViewedGames || 'Chưa có'}
+      - Game báo động hụt doanh thu (Được xem > 5 lần nhưng 0 ai mua): ${slowMoving || 'Tỷ lệ chuyển đổi hoàn hảo'}
     `;
 
-    const systemPrompt = `Bạn là Chuyên gia Phân tích Kinh doanh AI của Gam34Pers. 
-NHIỆM VỤ: Dựa trên dữ liệu doanh thu, hãy viết một bản tóm tắt tình hình kinh doanh "CÓ TÂM" cho chủ shop.
-YÊU CẦU ĐỊNH DẠNG: 
-- Sử dụng xuống dòng (\n) giữa các phần để dễ đọc.
-- Cấu trúc gồm 3 phần rõ rệt: Đánh giá (📊), Điểm sáng (🚀), và Lời khuyên (💡).
-- Ngôn ngữ chuyên nghiệp, súc tích, dùng emoji phù hợp.
-TRÌNH BÀY: Khoảng 4-5 dòng, mỗi phần một dòng riêng biệt.`;
+    const systemPrompt = `Bạn là Chuyên gia Phân tích Dữ liệu Kinh doanh xuất sắc của Gam34Pers. 
+NHIỆM VỤ: Phân tích sâu dữ liệu tôi cung cấp và lập báo cáo đa chiều.
+YÊU CẦU ĐỊNH DẠNG:
+- Trả lời bằng Markdown (dùng bôi đậm **text**, có xuống dòng).
+- Cấu trúc gồm đúng 4 phần bắt buộc: 
+  📊 **Tổng quan**: Đánh giá hiệu suất chung (Doanh thu, Đơn hàng, AOV).
+  🔥 **Sản phẩm Xu hướng**: Nhận định Top bán chạy và Top xem nhiều.
+  ⚠️ **Kẽ hở chuyển đổi**: Bắt buộc chỉ đích danh các "Game báo động hụt doanh thu" (high views, zero sales). Định dạng in đậm tên game. Dự đoán nguyên nhân (vd: giá cao so mặt bằng chung?).
+  💡 **Chiến lược gợi ý**: Đề xuất tỷ lệ % giảm giá hợp lý cho các Game hụt doanh thu ở trên để kích cầu, hoặc chiến dịch combo chéo.
+Viết mạch lạc, sắc sảo như một chuyên gia C-level thương mại điện tử thực thụ. (Khoảng 8-12 dòng).`;
 
     try {
       const fullPrompt = `${systemPrompt}\n\nDữ liệu thống kê hôm nay:\n${analyticsData}`;
