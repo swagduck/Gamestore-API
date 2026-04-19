@@ -8,7 +8,7 @@ const jwt = require("jsonwebtoken");
 const geminiKey = (process.env.GEMINI_API_KEY || "").trim();
 const genAI = new GoogleGenerativeAI(geminiKey);
 const chatModelGlobal = genAI.getGenerativeModel({ 
-  model: "gemini-3.1-flash-lite-preview",
+  model: "gemini-1.5-flash",
   tools: [{ googleSearch: {} }]
 });
 
