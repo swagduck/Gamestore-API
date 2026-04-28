@@ -63,6 +63,18 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
+
+// Fix Express 5 compatibility for express-mongo-sanitize
+app.use((req, res, next) => {
+  Object.defineProperty(req, 'query', {
+    value: { ...req.query },
+    writable: true,
+    configurable: true,
+    enumerable: true,
+  });
+  next();
+});
+
 app.use(mongoSanitize()); // Ngăn chặn NoSQL Injection
 
 // Database Connection
