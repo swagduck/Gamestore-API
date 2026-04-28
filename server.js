@@ -6,6 +6,8 @@ require('dotenv').config();
 const helmet = require('helmet');
 const compression = require('compression');
 const morgan = require('morgan');
+const cookieParser = require('cookie-parser');
+const mongoSanitize = require('express-mongo-sanitize');
 
 // Route imports
 const gameRoutes = require('./src/routes/gameRoutes');
@@ -60,6 +62,8 @@ app.use(cors({
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(cookieParser());
+app.use(mongoSanitize()); // Ngăn chặn NoSQL Injection
 
 // Database Connection
 const mongoOptions = {

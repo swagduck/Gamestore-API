@@ -3,6 +3,13 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 
+const cookieOptions = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+  maxAge: 60 * 60 * 1000 // 1 hour
+};
+
 const register = async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password || password.length < 6) {
@@ -23,9 +30,8 @@ const register = async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: "1h" }
     );
-    res.status(201).json({
+    res.cookie('token', token, cookieOptions).status(201).json({
       message: "Đăng ký thành công!",
-      token: token,
       user: { id: savedUser._id, email: savedUser.email, isAdmin: savedUser.isAdmin },
     });
   } catch (error) {
@@ -51,9 +57,8 @@ const login = async (req, res) => {
       { expiresIn: "1h" }
     );
 
-    res.json({
+    res.cookie('token', token, cookieOptions).json({
       message: "Đăng nhập thành công!",
-      token: token,
       user: { id: user._id, email: user.email, isAdmin: user.isAdmin },
     });
   } catch (error) {
@@ -90,9 +95,8 @@ const googleLogin = async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: "1h" }
     );
-    res.json({
+    res.cookie('token', gamestoreToken, cookieOptions).json({
       message: "Đăng nhập bằng Google thành công!",
-      token: gamestoreToken,
       user: { id: user._id, email: user.email, isAdmin: user.isAdmin, name: user.name, avatar: picture },
     });
   } catch (error) {
@@ -148,4 +152,18 @@ const resetPassword = async (req, res) => {
   }
 };
 
-module.exports = { register, login, googleLogin, forgotPassword, resetPassword };
+const logout = (req, res) => {
+  res.clearCookie('token', cookieOptions).json({ message: 'Đã đăng xuất thành công' });
+};
+
+const getMe = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select('-password');
+    if (!user) return res.status(404).json({ message: 'Không tìm thấy người dùng' });
+    res.json({ user: { id: user._id, email: user.email, isAdmin: user.isAdmin, name: user.name } });
+  } catch (error) {
+    res.status(500).json({ message: 'Lỗi máy chủ' });
+  }
+};
+
+module.exports = { register, login, googleLogin, forgotPassword, resetPassword, logout, getMe };

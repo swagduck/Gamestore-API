@@ -11,4 +11,14 @@ const checkRateLimit = rateLimit({
   legacyHeaders: false, 
 });
 
-module.exports = { checkRateLimit };
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 phút
+  max: 5, // Tối đa 5 lần thử sai
+  message: {
+    message: "Quá nhiều yêu cầu đăng nhập từ IP này, vui lòng thử lại sau 15 phút."
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+module.exports = { checkRateLimit, authLimiter };

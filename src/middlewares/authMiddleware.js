@@ -3,7 +3,7 @@ const User = require("../models/User");
 
 const verifyToken = async (req, res, next) => {
   try {
-    const token = req.headers.authorization?.split(" ")[1];
+    const token = req.cookies.token || req.headers.authorization?.split(" ")[1];
     if (!token) {
       return res
         .status(401)
@@ -23,7 +23,7 @@ const verifyToken = async (req, res, next) => {
 
 const verifyAdmin = async (req, res, next) => {
   try {
-    const token = req.headers.authorization?.split(" ")[1];
+    const token = req.cookies.token || req.headers.authorization?.split(" ")[1];
     if (!token) {
       return res
         .status(401)
