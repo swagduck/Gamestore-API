@@ -32,7 +32,7 @@ const register = async (req, res) => {
     );
     res.cookie('token', token, cookieOptions).status(201).json({
       message: "Đăng ký thành công!",
-      user: { id: savedUser._id, email: savedUser.email, isAdmin: savedUser.isAdmin },
+      user: { id: savedUser._id, email: savedUser.email, isAdmin: savedUser.isAdmin, name: savedUser.name, avatar: savedUser.avatar, createdAt: savedUser.createdAt },
     });
   } catch (error) {
     console.error("Lỗi đăng ký:", error);
@@ -59,7 +59,7 @@ const login = async (req, res) => {
 
     res.cookie('token', token, cookieOptions).json({
       message: "Đăng nhập thành công!",
-      user: { id: user._id, email: user.email, isAdmin: user.isAdmin },
+      user: { id: user._id, email: user.email, isAdmin: user.isAdmin, name: user.name, avatar: user.avatar, createdAt: user.createdAt },
     });
   } catch (error) {
     console.error("Lỗi đăng nhập:", error);
@@ -97,7 +97,7 @@ const googleLogin = async (req, res) => {
     );
     res.cookie('token', gamestoreToken, cookieOptions).json({
       message: "Đăng nhập bằng Google thành công!",
-      user: { id: user._id, email: user.email, isAdmin: user.isAdmin, name: user.name, avatar: picture },
+      user: { id: user._id, email: user.email, isAdmin: user.isAdmin, name: user.name, avatar: user.avatar, createdAt: user.createdAt },
     });
   } catch (error) {
     console.error("Lỗi xác thực Google:", error);
@@ -160,7 +160,7 @@ const getMe = async (req, res) => {
   try {
     const user = await User.findById(req.user._id).select('-password');
     if (!user) return res.status(404).json({ message: 'Không tìm thấy người dùng' });
-    res.json({ user: { id: user._id, email: user.email, isAdmin: user.isAdmin, name: user.name } });
+    res.json({ user: { id: user._id, email: user.email, isAdmin: user.isAdmin, name: user.name, avatar: user.avatar, createdAt: user.createdAt } });
   } catch (error) {
     res.status(500).json({ message: 'Lỗi máy chủ' });
   }
