@@ -28,7 +28,24 @@ const UserSchema = new mongoose.Schema(
     },
     avatar: {
       type: String
-    }
+    },
+    friendCode: {
+      type: String,
+      unique: true,
+      sparse: true // Cho phép null trong trường hợp user cũ chưa có, nhưng nếu có thì phải unique
+    },
+    friends: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    }],
+    friendRequests: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    }],
+    sentRequests: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    }]
   },
   { timestamps: true }
 ); // Tự động thêm createdAt và updatedAt

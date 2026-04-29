@@ -3,6 +3,18 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 
+const generateFriendCode = async () => {
+  let isUnique = false;
+  let friendCode;
+  while (!isUnique) {
+    const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
+    friendCode = `GAM-${randomStr}`;
+    const existing = await User.findOne({ friendCode });
+    if (!existing) isUnique = true;
+  }
+  return friendCode;
+};
+
 const cookieOptions = {
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
@@ -21,8 +33,9 @@ const register = async (req, res) => {
     
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
+    const friendCode = await generateFriendCode();
     
-    const newUser = new User({ email: email.toLowerCase(), password: hashedPassword, isAdmin: false });
+    const newUser = new User({ email: email.toLowerCase(), password: hashedPassword, isAdmin: false, friendCode });
     const savedUser = await newUser.save();
     
     const token = jwt.sign(
@@ -32,7 +45,7 @@ const register = async (req, res) => {
     );
     res.cookie('token', token, cookieOptions).status(201).json({
       message: "Đăng ký thành công!",
-      user: { id: savedUser._id, email: savedUser.email, isAdmin: savedUser.isAdmin, name: savedUser.name, avatar: savedUser.avatar, createdAt: savedUser.createdAt },
+      user: { id: savedUser._id, email: savedUser.email, isAdmin: savedUser.isAdmin, name: savedUser.name, avatar: savedUser.avatar, createdAt: savedUser.createdAt, friendCode: savedUser.friendCode },
     });
   } catch (error) {
     console.error("Lỗi đăng ký:", error);
@@ -51,6 +64,11 @@ const login = async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(400).json({ message: "Email hoặc mật khẩu không đúng." });
     
+    if (!user.friendCode) {
+      user.friendCode = await generateFriendCode();
+      await user.save();
+    }
+    
     const token = jwt.sign(
       { userId: user._id, email: user.email, isAdmin: user.isAdmin },
       process.env.JWT_SECRET,
@@ -59,7 +77,7 @@ const login = async (req, res) => {
 
     res.cookie('token', token, cookieOptions).json({
       message: "Đăng nhập thành công!",
-      user: { id: user._id, email: user.email, isAdmin: user.isAdmin, name: user.name, avatar: user.avatar, createdAt: user.createdAt },
+      user: { id: user._id, email: user.email, isAdmin: user.isAdmin, name: user.name, avatar: user.avatar, createdAt: user.createdAt, friendCode: user.friendCode },
     });
   } catch (error) {
     console.error("Lỗi đăng nhập:", error);
@@ -81,13 +99,20 @@ const googleLogin = async (req, res) => {
 
     if (!user) {
       const randomPassword = await bcrypt.hash(Math.random().toString(36).slice(-8) + Date.now().toString(), 10);
-      user = new User({ name, email, password: randomPassword, googleId, isAdmin: false });
+      const friendCode = await generateFriendCode();
+      user = new User({ name, email, password: randomPassword, googleId, isAdmin: false, friendCode });
       await user.save();
     } else {
+      let changed = false;
       if (!user.googleId) {
         user.googleId = googleId;
-        await user.save();
+        changed = true;
       }
+      if (!user.friendCode) {
+        user.friendCode = await generateFriendCode();
+        changed = true;
+      }
+      if (changed) await user.save();
     }
 
     const gamestoreToken = jwt.sign(
@@ -97,7 +122,7 @@ const googleLogin = async (req, res) => {
     );
     res.cookie('token', gamestoreToken, cookieOptions).json({
       message: "Đăng nhập bằng Google thành công!",
-      user: { id: user._id, email: user.email, isAdmin: user.isAdmin, name: user.name, avatar: user.avatar, createdAt: user.createdAt },
+      user: { id: user._id, email: user.email, isAdmin: user.isAdmin, name: user.name, avatar: user.avatar, createdAt: user.createdAt, friendCode: user.friendCode },
     });
   } catch (error) {
     console.error("Lỗi xác thực Google:", error);
@@ -160,7 +185,13 @@ const getMe = async (req, res) => {
   try {
     const user = await User.findById(req.user._id).select('-password');
     if (!user) return res.status(404).json({ message: 'Không tìm thấy người dùng' });
-    res.json({ user: { id: user._id, email: user.email, isAdmin: user.isAdmin, name: user.name, avatar: user.avatar, createdAt: user.createdAt } });
+    
+    if (!user.friendCode) {
+      user.friendCode = await generateFriendCode();
+      await user.save();
+    }
+    
+    res.json({ user: { id: user._id, email: user.email, isAdmin: user.isAdmin, name: user.name, avatar: user.avatar, createdAt: user.createdAt, friendCode: user.friendCode } });
   } catch (error) {
     res.status(500).json({ message: 'Lỗi máy chủ' });
   }
