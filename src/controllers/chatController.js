@@ -2,6 +2,7 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 const Game = require("../models/Game.js");
 const User = require("../models/User.js");
 const Order = require("../models/Order.js");
+const Message = require("../models/Message.js");
 const jwt = require("jsonwebtoken");
 
 // Initialize Google AI
@@ -135,6 +136,91 @@ LUÔN TRẢ VỀ JSON HỢP LỆ! TUYỆT ĐỐI KHÔNG xuất kết quả tìm 
   }
 };
 
+// Lấy lịch sử chat với một người bạn (50 tin nhắn gần nhất)
+const getChatHistory = async (req, res) => {
+  try {
+    const myId = req.user._id;
+    const { friendId } = req.params;
+
+    // Kiểm tra có phải bạn bè không
+    const me = await User.findById(myId);
+    if (!me.friends.includes(friendId)) {
+      return res.status(403).json({ message: 'Chỉ có thể chat với bạn bè' });
+    }
+
+    const messages = await Message.find({
+      $or: [
+        { sender: myId, receiver: friendId },
+        { sender: friendId, receiver: myId },
+      ],
+    })
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .lean();
+
+    // Đánh dấu đã đọc các tin nhắn từ friendId
+    await Message.updateMany(
+      { sender: friendId, receiver: myId, read: false },
+      { $set: { read: true } }
+    );
+
+    res.json({ messages: messages.reverse() });
+  } catch (error) {
+    console.error('Lỗi lấy lịch sử chat:', error);
+    res.status(500).json({ message: 'Lỗi máy chủ' });
+  }
+};
+
+// Lấy danh sách cuộc hội thoại (bạn bè đã nhắn tin + số chưa đọc)
+const getConversations = async (req, res) => {
+  try {
+    const myId = req.user._id;
+
+    const me = await User.findById(myId).populate('friends', 'name avatar email friendCode');
+    if (!me) return res.status(404).json({ message: 'Không tìm thấy user' });
+
+    // Với mỗi người bạn, lấy tin nhắn cuối và số chưa đọc
+    const conversations = await Promise.all(
+      me.friends.map(async (friend) => {
+        const lastMessage = await Message.findOne({
+          $or: [
+            { sender: myId, receiver: friend._id },
+            { sender: friend._id, receiver: myId },
+          ],
+        })
+          .sort({ createdAt: -1 })
+          .lean();
+
+        const unreadCount = await Message.countDocuments({
+          sender: friend._id,
+          receiver: myId,
+          read: false,
+        });
+
+        return {
+          friend,
+          lastMessage,
+          unreadCount,
+        };
+      })
+    );
+
+    // Sắp xếp: Ai nhắn gần nhất lên đầu
+    conversations.sort((a, b) => {
+      const aTime = a.lastMessage ? new Date(a.lastMessage.createdAt) : 0;
+      const bTime = b.lastMessage ? new Date(b.lastMessage.createdAt) : 0;
+      return bTime - aTime;
+    });
+
+    res.json({ conversations });
+  } catch (error) {
+    console.error('Lỗi lấy danh sách hội thoại:', error);
+    res.status(500).json({ message: 'Lỗi máy chủ' });
+  }
+};
+
 module.exports = {
-  handleChat
+  handleChat,
+  getChatHistory,
+  getConversations,
 };
