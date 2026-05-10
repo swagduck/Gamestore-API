@@ -33,18 +33,24 @@ const PORT = process.env.PORT || 4000;
 console.log('🚀 BACKEND STARTING...');
 
 // --- CORS Config (shared for Express & Socket.io) ---
+// Chỉ allow đúng origin đã cấu hình, không cho phép wildcard *.vercel.app
+const getAllowedOrigins = () => {
+  const origins = ['http://localhost:5173', 'http://localhost:5174'];
+  if (process.env.FRONTEND_URL) {
+    const url = process.env.FRONTEND_URL.replace(/\/$/, ''); // strip trailing slash
+    if (!origins.includes(url)) origins.push(url);
+  }
+  return origins;
+};
+
 const corsOptions = {
   origin: function (origin, callback) {
-    const allowed = [
-      'http://localhost:5173',
-      'http://localhost:5174'
-    ];
-    if (process.env.FRONTEND_URL && !allowed.includes(process.env.FRONTEND_URL)) {
-      allowed.push(process.env.FRONTEND_URL);
-    }
-    if (!origin || allowed.indexOf(origin) !== -1 || (origin && origin.includes('vercel.app'))) {
+    const allowed = getAllowedOrigins();
+    // Allow no-origin requests (curl, Postman, server-to-server)
+    if (!origin || allowed.includes(origin)) {
       callback(null, true);
     } else {
+      console.warn(`[CORS] Blocked origin: ${origin}`);
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -123,11 +129,11 @@ app.use((err, req, res, next) => {
 const io = new Server(httpServer, {
   cors: {
     origin: function (origin, callback) {
-      const allowed = ['http://localhost:5173', 'http://localhost:5174'];
-      if (process.env.FRONTEND_URL) allowed.push(process.env.FRONTEND_URL);
-      if (!origin || allowed.includes(origin) || (origin && origin.includes('vercel.app'))) {
+      const allowed = getAllowedOrigins();
+      if (!origin || allowed.includes(origin)) {
         callback(null, true);
       } else {
+        console.warn(`[Socket CORS] Blocked origin: ${origin}`);
         callback(new Error('Not allowed by CORS'));
       }
     },
@@ -176,7 +182,20 @@ io.on('connection', (socket) => {
   socket.on('send_message', async (data) => {
     try {
       const { receiverId, content } = data;
-      if (!content || !content.trim() || !receiverId) return;
+
+      // --- Validation ---
+      if (!content || !content.trim()) {
+        return socket.emit('message_error', { message: 'Nội dung tin nhắn không được để trống' });
+      }
+      if (content.trim().length > 2000) {
+        return socket.emit('message_error', { message: 'Tin nhắn quá dài (tối đa 2000 ký tự)' });
+      }
+      if (!receiverId || !/^[a-f\d]{24}$/i.test(receiverId)) {
+        return socket.emit('message_error', { message: 'Người nhận không hợp lệ' });
+      }
+      if (receiverId === userId) {
+        return socket.emit('message_error', { message: 'Không thể nhắn tin cho chính mình' });
+      }
 
       // Lưu vào DB
       const message = await Message.create({
