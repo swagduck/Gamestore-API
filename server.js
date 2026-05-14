@@ -99,6 +99,33 @@ mongoose.connect(process.env.MONGO_URI, mongoOptions)
   .then(() => console.log("✅ Kết nối MongoDB Atlas thành công!"))
   .catch(err => console.error("❌ Lỗi kết nối MongoDB:", err));
 
+// --- SOCKET.IO SETUP ---
+const io = new Server(httpServer, {
+  cors: {
+    origin: function (origin, callback) {
+      const allowed = getAllowedOrigins();
+      if (!origin || allowed.includes(origin)) {
+        callback(null, true);
+      } else {
+        console.warn(`[Socket CORS] Blocked origin: ${origin}`);
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true,
+  },
+  transports: ['websocket', 'polling'],
+});
+
+// Map: userId (string) -> socketId
+const onlineUsers = new Map();
+
+// Inject io into request
+app.use((req, res, next) => {
+  req.io = io;
+  req.onlineUsers = onlineUsers;
+  next();
+});
+
 // API Routes
 app.get("/api/test", (req, res) => {
   res.json({ message: "API is working!", timestamp: new Date().toISOString() });
@@ -125,27 +152,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-// --- SOCKET.IO SETUP ---
-const io = new Server(httpServer, {
-  cors: {
-    origin: function (origin, callback) {
-      const allowed = getAllowedOrigins();
-      if (!origin || allowed.includes(origin)) {
-        callback(null, true);
-      } else {
-        console.warn(`[Socket CORS] Blocked origin: ${origin}`);
-        callback(new Error('Not allowed by CORS'));
-      }
-    },
-    credentials: true,
-  },
-  transports: ['websocket', 'polling'],
-});
-
-// Map: userId (string) -> socketId
-const onlineUsers = new Map();
-
-// Middleware xác thực Socket qua cookie JWT
+// Global Error Handling Middleware
 io.use((socket, next) => {
   try {
     // Lấy token từ cookie (gửi kèm trong handshake)
@@ -204,9 +211,14 @@ io.on('connection', (socket) => {
         content: content.trim(),
       });
 
+      // Lấy thông tin người gửi để gửi kèm trong thông báo
+      const User = require('./src/models/User');
+      const senderUser = await User.findById(userId).select('name avatar');
+
       const messageData = {
         _id: message._id,
         sender: userId,
+        senderName: senderUser ? senderUser.name : 'Người dùng',
         receiver: receiverId,
         content: message.content,
         read: false,

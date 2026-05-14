@@ -177,6 +177,17 @@ const sendFriendRequest = async (req, res) => {
     await currentUser.save();
     await targetUser.save();
 
+    // Phát sự kiện realtime cho người nhận lời mời
+    if (req.io && req.onlineUsers) {
+      const targetSocketId = req.onlineUsers.get(targetUser._id.toString());
+      if (targetSocketId) {
+        req.io.to(targetSocketId).emit('new_friend_request', {
+          message: `${currentUser.name} đã gửi cho bạn một lời mời kết bạn!`,
+          fromUser: { id: currentUser._id, name: currentUser.name, avatar: currentUser.avatar }
+        });
+      }
+    }
+
     res.json({ message: "Đã gửi lời mời kết bạn thành công", targetUser: { id: targetUser._id, name: targetUser.name } });
   } catch (error) {
     console.error("Lỗi gửi lời mời kết bạn:", error);
@@ -206,6 +217,17 @@ const acceptFriendRequest = async (req, res) => {
 
     await currentUser.save();
     await requestingUser.save();
+
+    // Phát sự kiện realtime cho người gửi lời mời gốc biết rằng lời mời đã được chấp nhận
+    if (req.io && req.onlineUsers) {
+      const requesterSocketId = req.onlineUsers.get(requestingUser._id.toString());
+      if (requesterSocketId) {
+        req.io.to(requesterSocketId).emit('friend_request_accepted', {
+          message: `${currentUser.name} đã chấp nhận lời mời kết bạn của bạn!`,
+          fromUser: { id: currentUser._id, name: currentUser.name, avatar: currentUser.avatar }
+        });
+      }
+    }
 
     res.json({ message: "Đã chấp nhận lời mời kết bạn" });
   } catch (error) {
