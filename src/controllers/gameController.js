@@ -10,7 +10,9 @@ const getAllGames = async (req, res) => {
     if (mongoose.connection.readyState !== 1) {
       return res.status(503).json({ message: "Database temporarily unavailable." });
     }
-    const { limit, sort, order = "desc" } = req.query;
+    const { limit, sort } = req.query;
+    // createdAt luôn sắp xếp mới nhất trước (desc), rating cũng desc
+    const order = sort === 'createdAt' || sort === 'rating' ? 'desc' : (req.query.order || 'desc');
     const cacheKey = `games_${limit || 'all'}_${sort || 'none'}_${order}`;
     
     if (redisClient && redisClient.isOpen) {
@@ -24,7 +26,7 @@ const getAllGames = async (req, res) => {
     let query = Game.find();
     if (sort) {
       const sortOptions = {};
-      sortOptions[sort] = order === "desc" ? -1 : 1;
+      sortOptions[sort] = order === 'desc' ? -1 : 1;
       query = query.sort(sortOptions);
     }
     if (limit) query = query.limit(parseInt(limit, 10));
@@ -122,6 +124,12 @@ const addGame = async (req, res) => {
   try {
     const game = new Game(req.body);
     await game.save();
+    // Xóa cache để game mới hiển thị ngay trên trang chủ
+    myCache.flushAll();
+    if (redisClient && redisClient.isOpen) {
+      const keys = await redisClient.keys('games_*');
+      if (keys.length) await redisClient.del(keys);
+    }
     res.status(201).json(game);
   } catch (err) {
     if (err.name === "ValidationError") return res.status(400).json({ message: err.message });
@@ -134,7 +142,6 @@ const updateGame = async (req, res) => {
     const oldGame = await Game.findById(req.params.id);
     if (!oldGame) return res.status(404).json({ message: "Không tìm thấy game để cập nhật" });
     
-    // Xóa ảnh cũ trên Cloudinary nếu người dùng nhập link ảnh mới
     if (req.body.image && req.body.image !== oldGame.image) {
       if (oldGame.image && oldGame.image.includes('cloudinary.com') && oldGame.image.includes('/gamestore_avatars/')) {
         try {
@@ -147,6 +154,12 @@ const updateGame = async (req, res) => {
     }
 
     const updatedGame = await Game.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+    // Xóa cache để thay đổi hiển thị ngay
+    myCache.flushAll();
+    if (redisClient && redisClient.isOpen) {
+      const keys = await redisClient.keys('games_*');
+      if (keys.length) await redisClient.del(keys);
+    }
     res.json(updatedGame);
   } catch (err) {
     if (err.name === "ValidationError") return res.status(400).json({ message: err.message });
@@ -168,7 +181,12 @@ const deleteGame = async (req, res) => {
         console.error('Error deleting image on Cloudinary:', err);
       }
     }
-
+    // Xóa cache
+    myCache.flushAll();
+    if (redisClient && redisClient.isOpen) {
+      const keys = await redisClient.keys('games_*');
+      if (keys.length) await redisClient.del(keys);
+    }
     res.json({ message: "Đã xóa game thành công" });
   } catch (err) {
     if (err.name === "CastError") return res.status(400).json({ message: "ID game không hợp lệ." });
