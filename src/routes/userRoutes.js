@@ -13,7 +13,8 @@ router.put('/:id/toggle-admin', verifyAdmin, userController.toggleAdminStatus);
 // Cập nhật profile user hiện tại
 router.put('/profile', verifyToken, upload.single('avatar'), userController.updateUserProfile);
 
-// --- ROUTES BẠN BÈ ---
+// --- ROUTES BẠN BÈ & PROFILE ---
+router.get('/profile/:id', verifyToken, userController.getPublicProfile);
 router.get('/friends', verifyToken, userController.getFriends);
 router.post('/friends/request', verifyToken, userController.sendFriendRequest);
 router.post('/friends/accept', verifyToken, userController.acceptFriendRequest);

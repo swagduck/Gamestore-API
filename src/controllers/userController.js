@@ -144,19 +144,28 @@ const getFriends = async (req, res) => {
   }
 };
 
-// Gửi lời mời kết bạn bằng friendCode
+// Gửi lời mời kết bạn bằng friendCode hoặc userId
 const sendFriendRequest = async (req, res) => {
   try {
-    const { friendCode } = req.body;
-    if (!friendCode) return res.status(400).json({ message: "Vui lòng nhập mã kết bạn" });
+    const { friendCode, userId } = req.body;
+    if (!friendCode && !userId) return res.status(400).json({ message: "Vui lòng nhập mã kết bạn hoặc ID người dùng" });
 
     const currentUser = await User.findById(req.user._id);
-    if (currentUser.friendCode === friendCode) {
-      return res.status(400).json({ message: "Bạn không thể tự kết bạn với chính mình" });
+    let targetUser;
+
+    if (userId) {
+      if (currentUser._id.toString() === userId) {
+        return res.status(400).json({ message: "Bạn không thể tự kết bạn với chính mình" });
+      }
+      targetUser = await User.findById(userId);
+    } else {
+      if (currentUser.friendCode === friendCode) {
+        return res.status(400).json({ message: "Bạn không thể tự kết bạn với chính mình" });
+      }
+      targetUser = await User.findOne({ friendCode });
     }
 
-    const targetUser = await User.findOne({ friendCode });
-    if (!targetUser) return res.status(404).json({ message: "Không tìm thấy người dùng với mã này" });
+    if (!targetUser) return res.status(404).json({ message: "Không tìm thấy người dùng" });
 
     // Kiểm tra xem đã là bạn bè chưa
     if (currentUser.friends.includes(targetUser._id)) {
@@ -305,6 +314,45 @@ const removeFriend = async (req, res) => {
   }
 };
 
+// Xem Hồ sơ công khai
+const getPublicProfile = async (req, res) => {
+  try {
+    const targetUserId = req.params.id;
+    const currentUserId = req.user._id.toString();
+
+    const targetUser = await User.findById(targetUserId).select('name avatar level exp achievements friendCode friends friendRequests sentRequests createdAt');
+    if (!targetUser) return res.status(404).json({ message: "Không tìm thấy người dùng" });
+
+    let relationship = 'none';
+    if (targetUserId === currentUserId) {
+      relationship = 'self';
+    } else if (targetUser.friends.some(id => id.toString() === currentUserId)) {
+      relationship = 'friend';
+    } else if (targetUser.friendRequests.some(id => id.toString() === currentUserId)) {
+      relationship = 'sent'; // Current user đã gửi request
+    } else if (targetUser.sentRequests.some(id => id.toString() === currentUserId)) {
+      relationship = 'received'; // Target user đang gửi request cho mình
+    }
+
+    res.json({
+      user: {
+        _id: targetUser._id,
+        name: targetUser.name,
+        avatar: targetUser.avatar,
+        level: targetUser.level,
+        exp: targetUser.exp,
+        achievements: targetUser.achievements,
+        friendCode: targetUser.friendCode,
+        createdAt: targetUser.createdAt
+      },
+      relationship
+    });
+  } catch (error) {
+    console.error("Lỗi xem profile:", error);
+    res.status(500).json({ message: "Lỗi máy chủ" });
+  }
+};
+
 module.exports = {
   getAllUsers,
   toggleAdminStatus,
@@ -313,5 +361,6 @@ module.exports = {
   sendFriendRequest,
   acceptFriendRequest,
   rejectFriendRequest,
-  removeFriend
+  removeFriend,
+  getPublicProfile
 };
