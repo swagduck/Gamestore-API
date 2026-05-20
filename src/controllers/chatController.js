@@ -9,8 +9,10 @@ const jwt = require("jsonwebtoken");
 const geminiKey = (process.env.GEMINI_API_KEY || "").trim();
 const genAI = new GoogleGenerativeAI(geminiKey);
 const chatModelGlobal = genAI.getGenerativeModel({ 
-  model: "gemini-2.0-flash",
-  tools: [{ googleSearch: {} }]
+  model: "gemini-3.1-flash-lite",
+  generationConfig: {
+    responseMimeType: "application/json",
+  }
 });
 
 const handleChat = async (req, res) => {
@@ -50,28 +52,27 @@ const handleChat = async (req, res) => {
       `- ${g.name}: [Thể loại: ${g.genre.join(", ")}], [Giá: $${g.price}], [Đánh giá: ${g.rating}/5], Mô tả: ${g.description.substring(0, 100)}...`
     ).join("\n");
 
-    // 3. Nâng cấp System Prompt
-    const systemPrompt = `Bạn là GameBot 🤖 - Chuyên gia tư vấn game cao cấp của Gam34Pers.
-NHIỆM VỤ: Phân tích nhu cầu, so sánh game và đưa ra lời khuyên "CÓ GU" cho khách hàng. Đừng chỉ là một thanh tìm kiếm!
+    // 3. Nâng cấp System Prompt: Cho phép trả lời tự do + Yêu cầu JSON nghiêm ngặt từ model level
+    const systemPrompt = `Bạn là GameBot 🤖 - Chuyên gia tư vấn game của Gam34Pers.
+Bạn được tự do trò chuyện về MỌI CHỦ ĐỀ với người dùng (như một người bạn), tuy nhiên hãy luôn giữ phong cách vui vẻ và khéo léo liên hệ đến Game hoặc gợi ý game trong cửa hàng nếu phù hợp.
 
 THÔNG TIN NGƯỜI DÙNG HIỆN TẠI:
 - Trạng thái: ${userContext}
 - ${ownedGamesList}
 
-KIẾN THỨC VỀ CÁC GAME TRONG CỬA HÀNG (Dùng để tư vấn & so sánh):
+KIẾN THỨC VỀ CÁC GAME TRONG CỬA HÀNG (Dùng để tư vấn):
 ${gamesKnowledge}
 
-QUYỀN HẠN ĐẶC BIỆT (INTERNET ACCESS):
-- Nếu người dùng hỏi các chi tiết sâu (cốt truyện, gameplay cơ bản, nhà phát triển) hoặc hỏi về một TỰA GAME KHÔNG CÓ trong danh sách cửa hàng, BẠN BẮT BUỘC SỬ DỤNG GOOGLE SEARCH để lấy thông tin thực tế trên mạng và review cực kỳ chi tiết cho họ.
+QUY TẮC PHẢN HỒI (BẮT BUỘC TRẢ VỀ JSON DO CONFIGURATION ĐÃ KHÓA JSON):
+Bạn PHẢI trả về ĐÚNG MỘT JSON Object chứa 2 trường:
+1. "response": Lời phản hồi tự nhiên, vui vẻ, thoải mái của bạn (dùng Markdown để in đậm, gạch đầu dòng, emoji). Dù hỏi bất cứ chuyện gì trên đời, hãy thoải mái nói chuyện!
+2. "query": Nếu người dùng đang tìm kiếm hoặc bạn chủ động muốn gợi ý game từ cửa hàng, hãy điền từ khóa vào đây (Ví dụ: { "genre": "Hành động" } hoặc { "name": "Zelda" } hoặc { "platform": "PC" }). Nếu chỉ đang trò chuyện bình thường mà không cần hiển thị thẻ game bên dưới, hãy để null hoặc object rỗng {}.
 
-QUY TẮC PHẢN HỒI (CHỈ TRẢ VỀ CHUẨN JSON):
-\`\`\`json
+Ví dụ Output JSON hợp lệ:
 {
-  "response": "Trình bày câu trả lời SIÊU ĐẸP bằng Markdown! Dùng: \n- **Tiêu đề** (ví dụ: ### 🎮 Góc Tư Vấn)\n- **In đậm** tên game (**Elden Ring**)\n- **Gạch đầu dòng (-)** liệt kê cốt truyện/ưu điểm\n- **Nhiều Emoji** 🔥✨⚔️.\nChia đoạn ngắn gọn, dễ nhìn.",
-  "query": { "genre": "thể loại", "platform": "PC", "name": "tên game" }
-}
-\`\`\`
-LUÔN TRẢ VỀ JSON HỢP LỆ! TUYỆT ĐỐI KHÔNG xuất kết quả tìm kiếm Google ra ngoài khối JSON. Mọi thông tin (kể cả kết quả từ mạng) phải được nhét gọn đẹp vào bên trong biến "response". Không comment ngoài JSON.`;
+  "response": "Trời mưa lạnh thế này thì ở nhà trùm chăn chơi **Stardew Valley** trồng trọt là tuyệt nhất đó bạn ơi! 🌧️🌾 Mình gợi ý game này cho bạn nhé!",
+  "query": { "genre": "Mô phỏng" }
+}`;
 
     if (!process.env.GEMINI_API_KEY) {
       return res.status(500).json({ text: "AI service not configured" });
@@ -103,15 +104,10 @@ LUÔN TRẢ VỀ JSON HỢP LỆ! TUYỆT ĐỐI KHÔNG xuất kết quả tìm 
 
     let aiJson;
     try {
-      const jsonMatch = aiResponseText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-         aiJson = JSON.parse(jsonMatch[0]);
-      } else {
-         throw new Error("No JSON");
-      }
+      aiJson = JSON.parse(aiResponseText);
     } catch (e) {
       return res.json({
-        text: aiResponseText.replace(/```json|```/g, "").trim() || "Chào bạn! Mình có thể giúp gì được cho bạn?",
+        text: "Xin lỗi, não bộ AI vừa bị rối nhẹ, bạn nói lại xíu nha!",
         results: [],
       });
     }

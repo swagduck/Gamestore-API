@@ -206,13 +206,14 @@ const getRecommendations = async (req, res) => {
     Return ONLY a raw JSON array (no markdown block) of objects with 2 fields: 
     "id" (the game _id) and "aiReasoning" (the reason).`;
 
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-3.1-flash-lite",
+      generationConfig: {
+        responseMimeType: "application/json",
+      }
+    });
     const result = await model.generateContent(prompt);
-    let aiText = result.response.text();
-    // Xóa block markdown nếu có
-    if (aiText.startsWith('```')) {
-       aiText = aiText.replace(/```json/gi, '').replace(/```/gi, '').trim();
-    }
+    const aiText = result.response.text();
     const aiResult = JSON.parse(aiText);
 
     const recommendedGames = [];
