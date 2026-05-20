@@ -9,6 +9,8 @@ const helmet = require('helmet');
 const compression = require('compression');
 const morgan = require('morgan');
 const cookieParser = require('cookie-parser');
+const { createAdapter } = require('@socket.io/redis-adapter');
+const { createClient } = require('redis');
 const mongoSanitize = require('express-mongo-sanitize');
 const jwt = require('jsonwebtoken');
 const Message = require('./src/models/Message');
@@ -121,7 +123,16 @@ const io = new Server(httpServer, {
   transports: ['websocket', 'polling'],
 });
 
-// Map: userId (string) -> socketId
+if (process.env.REDIS_URL) {
+  const pubClient = createClient({ url: process.env.REDIS_URL });
+  const subClient = pubClient.duplicate();
+  Promise.all([pubClient.connect(), subClient.connect()]).then(() => {
+    io.adapter(createAdapter(pubClient, subClient));
+    console.log('✅ Socket.io Redis Adapter enabled');
+  }).catch(err => console.error('❌ Redis Adapter error:', err));
+}
+
+// Map: userId (string) -> socketId (Fallback for single instance metrics)
 const onlineUsers = new Map();
 
 // Inject io into request
@@ -182,61 +193,31 @@ io.use((socket, next) => {
 io.on('connection', (socket) => {
   const userId = socket.userId;
   onlineUsers.set(userId, socket.id);
+  socket.join(userId); // JOIN ROOM "userId" cho phép scale ngang
   console.log(`🟢 User ${userId} connected. Online: ${onlineUsers.size}`);
 
-  // Thông báo cho tất cả bạn bè biết mình đang online
   socket.broadcast.emit('friend_online', { userId });
-
-  // Gửi danh sách người đang online cho user vừa kết nối
   socket.emit('online_users', Array.from(onlineUsers.keys()));
 
-  // --- GỬI TIN NHẮN ---
   socket.on('send_message', async (data) => {
     try {
       const { receiverId, content } = data;
+      if (!content || !content.trim()) return socket.emit('message_error', { message: 'Nội dung tin nhắn không được để trống' });
+      if (content.trim().length > 2000) return socket.emit('message_error', { message: 'Tin nhắn quá dài' });
+      if (!receiverId || !/^[a-f\d]{24}$/i.test(receiverId)) return socket.emit('message_error', { message: 'Người nhận không hợp lệ' });
+      if (receiverId === userId) return socket.emit('message_error', { message: 'Không thể nhắn tin cho chính mình' });
 
-      // --- Validation ---
-      if (!content || !content.trim()) {
-        return socket.emit('message_error', { message: 'Nội dung tin nhắn không được để trống' });
-      }
-      if (content.trim().length > 2000) {
-        return socket.emit('message_error', { message: 'Tin nhắn quá dài (tối đa 2000 ký tự)' });
-      }
-      if (!receiverId || !/^[a-f\d]{24}$/i.test(receiverId)) {
-        return socket.emit('message_error', { message: 'Người nhận không hợp lệ' });
-      }
-      if (receiverId === userId) {
-        return socket.emit('message_error', { message: 'Không thể nhắn tin cho chính mình' });
-      }
-
-      // Lưu vào DB
-      const message = await Message.create({
-        sender: userId,
-        receiver: receiverId,
-        content: content.trim(),
-      });
-
-      // Lấy thông tin người gửi để gửi kèm trong thông báo
+      const message = await Message.create({ sender: userId, receiver: receiverId, content: content.trim() });
       const User = require('./src/models/User');
       const senderUser = await User.findById(userId).select('name avatar');
 
       const messageData = {
-        _id: message._id,
-        sender: userId,
-        senderName: senderUser ? senderUser.name : 'Người dùng',
-        receiver: receiverId,
-        content: message.content,
-        read: false,
-        createdAt: message.createdAt,
+        _id: message._id, sender: userId, senderName: senderUser ? senderUser.name : 'Người dùng',
+        receiver: receiverId, content: message.content, read: false, createdAt: message.createdAt,
       };
 
-      // Gửi cho người nhận nếu đang online
-      const receiverSocketId = onlineUsers.get(receiverId);
-      if (receiverSocketId) {
-        io.to(receiverSocketId).emit('receive_message', messageData);
-      }
-
-      // Gửi lại cho chính người gửi để confirm
+      // Gửi bằng Redis Adapter thông qua Room (io.to)
+      io.to(receiverId).emit('receive_message', messageData);
       socket.emit('message_sent', messageData);
     } catch (err) {
       console.error('Lỗi gửi tin nhắn socket:', err);
@@ -244,24 +225,15 @@ io.on('connection', (socket) => {
     }
   });
 
-  // --- ĐÁNH DẤU ĐÃ ĐỌC ---
   socket.on('messages_read', async ({ senderId }) => {
     try {
-      await Message.updateMany(
-        { sender: senderId, receiver: userId, read: false },
-        { $set: { read: true } }
-      );
-      // Thông báo cho người gửi tin nhắn gốc biết đã được đọc
-      const senderSocketId = onlineUsers.get(senderId);
-      if (senderSocketId) {
-        io.to(senderSocketId).emit('messages_read_ack', { by: userId });
-      }
+      await Message.updateMany({ sender: senderId, receiver: userId, read: false }, { $set: { read: true } });
+      io.to(senderId).emit('messages_read_ack', { by: userId });
     } catch (err) {
       console.error('Lỗi đánh dấu đã đọc:', err);
     }
   });
 
-  // --- DISCONNECT ---
   socket.on('disconnect', () => {
     onlineUsers.delete(userId);
     socket.broadcast.emit('friend_offline', { userId });

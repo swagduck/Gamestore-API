@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const Game = require("../models/Game");
 const NodeCache = require("node-cache");
 const { cloudinary } = require("../utils/cloudinary");
+const redisClient = require("../utils/redisClient");
 const myCache = new NodeCache({ stdTTL: 300, checkperiod: 120 });
 
 const getAllGames = async (req, res) => {
@@ -11,8 +12,14 @@ const getAllGames = async (req, res) => {
     }
     const { limit, sort, order = "desc" } = req.query;
     const cacheKey = `games_${limit || 'all'}_${sort || 'none'}_${order}`;
-    const cachedData = myCache.get(cacheKey);
-    if (cachedData) return res.json(cachedData);
+    
+    if (redisClient && redisClient.isOpen) {
+      const cachedData = await redisClient.get(cacheKey);
+      if (cachedData) return res.json(JSON.parse(cachedData));
+    } else {
+      const cachedData = myCache.get(cacheKey);
+      if (cachedData) return res.json(cachedData);
+    }
 
     let query = Game.find();
     if (sort) {
@@ -23,7 +30,13 @@ const getAllGames = async (req, res) => {
     if (limit) query = query.limit(parseInt(limit, 10));
 
     const games = await query.exec();
-    myCache.set(cacheKey, games);
+    
+    if (redisClient && redisClient.isOpen) {
+      await redisClient.setEx(cacheKey, 300, JSON.stringify(games));
+    } else {
+      myCache.set(cacheKey, games);
+    }
+    
     res.json(games);
   } catch (err) {
     if (err.name === 'MongooseServerSelectionError') {
@@ -163,6 +176,8 @@ const deleteGame = async (req, res) => {
   }
 };
 
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+
 const getRecommendations = async (req, res) => {
   try {
     const { cartItems } = req.body;
@@ -171,14 +186,62 @@ const getRecommendations = async (req, res) => {
     }
     const currentIds = cartItems.map((item) => item._id);
     const currentGenres = [...new Set(cartItems.flatMap((item) => item.genre))];
-    const recommendations = await Game.find({
-      genre: { $in: currentGenres },
-      _id: { $nin: currentIds },
-    }).limit(5);
-    res.json(recommendations);
+    
+    if (!process.env.GEMINI_API_KEY) {
+      const recommendations = await Game.find({
+        genre: { $in: currentGenres },
+        _id: { $nin: currentIds },
+      }).limit(5).lean();
+      return res.json(recommendations);
+    }
+
+    const candidates = await Game.find({ _id: { $nin: currentIds } }).limit(20).lean();
+    
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const prompt = `You are a game recommendation AI for Gamestore. 
+    The user has these games in their cart/history: ${cartItems.map(g => g.name + ' (' + g.genre + ')').join(', ')}.
+    Available candidate games: ${candidates.map(g => g._id + ': ' + g.name + ' (' + g.genre + ')').join(' | ')}.
+    Select exactly 5 best candidate games for this user based on their genres. 
+    For each selected game, write a short 1-sentence reasoning (in Vietnamese) why they would like it.
+    Return ONLY a raw JSON array (no markdown block) of objects with 2 fields: 
+    "id" (the game _id) and "aiReasoning" (the reason).`;
+
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const result = await model.generateContent(prompt);
+    let aiText = result.response.text();
+    // Xóa block markdown nếu có
+    if (aiText.startsWith('```')) {
+       aiText = aiText.replace(/```json/gi, '').replace(/```/gi, '').trim();
+    }
+    const aiResult = JSON.parse(aiText);
+
+    const recommendedGames = [];
+    for (let aiObj of aiResult) {
+      const game = candidates.find(c => c._id.toString() === aiObj.id);
+      if (game) {
+        game.aiReasoning = aiObj.aiReasoning;
+        recommendedGames.push(game);
+      }
+    }
+    
+    if (recommendedGames.length === 0) {
+       const fallback = await Game.find({ genre: { $in: currentGenres }, _id: { $nin: currentIds } }).limit(5).lean();
+       return res.json(fallback);
+    }
+    
+    res.json(recommendedGames);
   } catch (error) {
     console.error("Lỗi khi tạo đề xuất:", error);
-    res.status(500).json({ message: "Không thể tạo đề xuất" });
+    // Lỗi gọi Gemini thì trả fallback
+    try {
+      const { cartItems } = req.body;
+      const currentIds = cartItems.map((item) => item._id);
+      const currentGenres = [...new Set(cartItems.flatMap((item) => item.genre))];
+      const fallback = await Game.find({ genre: { $in: currentGenres }, _id: { $nin: currentIds } }).limit(5).lean();
+      return res.json(fallback);
+    } catch (fallbackError) {
+      res.status(500).json({ message: "Không thể tạo đề xuất" });
+    }
   }
 };
 
