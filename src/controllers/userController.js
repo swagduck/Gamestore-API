@@ -109,7 +109,10 @@ const updateUserProfile = async (req, res) => {
         avatar: user.avatar,
         isAdmin: user.isAdmin,
         createdAt: user.createdAt,
-        friendCode: user.friendCode
+        friendCode: user.friendCode,
+        exp: user.exp,
+        level: user.level,
+        achievements: user.achievements
       }
     });
   } catch (error) {
@@ -217,6 +220,14 @@ const acceptFriendRequest = async (req, res) => {
 
     await currentUser.save();
     await requestingUser.save();
+
+    try {
+      const { addExpAndCheckBadges } = require("../utils/leveling");
+      await addExpAndCheckBadges(currentUser._id, 50); // 50 exp for making a friend
+      await addExpAndCheckBadges(requestingUser._id, 50);
+    } catch (e) {
+      console.error("Leveling error in friends:", e);
+    }
 
     // Phát sự kiện realtime cho người gửi lời mời gốc biết rằng lời mời đã được chấp nhận
     if (req.io && req.onlineUsers) {

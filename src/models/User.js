@@ -45,6 +45,17 @@ const UserSchema = new mongoose.Schema(
     sentRequests: [{
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User'
+    }],
+    exp: {
+      type: Number,
+      default: 0
+    },
+    level: {
+      type: Number,
+      default: 1
+    },
+    achievements: [{
+      type: String
     }]
   },
   { timestamps: true }

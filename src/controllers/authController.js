@@ -45,7 +45,7 @@ const register = async (req, res) => {
     );
     res.cookie('token', token, cookieOptions).status(201).json({
       message: "Đăng ký thành công!",
-      user: { id: savedUser._id, email: savedUser.email, isAdmin: savedUser.isAdmin, name: savedUser.name, avatar: savedUser.avatar, createdAt: savedUser.createdAt, friendCode: savedUser.friendCode },
+      user: { id: savedUser._id, email: savedUser.email, isAdmin: savedUser.isAdmin, name: savedUser.name, avatar: savedUser.avatar, createdAt: savedUser.createdAt, friendCode: savedUser.friendCode, exp: savedUser.exp, level: savedUser.level, achievements: savedUser.achievements },
     });
   } catch (error) {
     console.error("Lỗi đăng ký:", error);
@@ -77,7 +77,7 @@ const login = async (req, res) => {
 
     res.cookie('token', token, cookieOptions).json({
       message: "Đăng nhập thành công!",
-      user: { id: user._id, email: user.email, isAdmin: user.isAdmin, name: user.name, avatar: user.avatar, createdAt: user.createdAt, friendCode: user.friendCode },
+      user: { id: user._id, email: user.email, isAdmin: user.isAdmin, name: user.name, avatar: user.avatar, createdAt: user.createdAt, friendCode: user.friendCode, exp: user.exp, level: user.level, achievements: user.achievements },
     });
   } catch (error) {
     console.error("Lỗi đăng nhập:", error);
@@ -122,7 +122,7 @@ const googleLogin = async (req, res) => {
     );
     res.cookie('token', gamestoreToken, cookieOptions).json({
       message: "Đăng nhập bằng Google thành công!",
-      user: { id: user._id, email: user.email, isAdmin: user.isAdmin, name: user.name, avatar: user.avatar, createdAt: user.createdAt, friendCode: user.friendCode },
+      user: { id: user._id, email: user.email, isAdmin: user.isAdmin, name: user.name, avatar: user.avatar, createdAt: user.createdAt, friendCode: user.friendCode, exp: user.exp, level: user.level, achievements: user.achievements },
     });
   } catch (error) {
     console.error("Lỗi xác thực Google:", error);
@@ -191,7 +191,7 @@ const getMe = async (req, res) => {
       await user.save();
     }
     
-    res.json({ user: { id: user._id, email: user.email, isAdmin: user.isAdmin, name: user.name, avatar: user.avatar, createdAt: user.createdAt, friendCode: user.friendCode } });
+    res.json({ user: { id: user._id, email: user.email, isAdmin: user.isAdmin, name: user.name, avatar: user.avatar, createdAt: user.createdAt, friendCode: user.friendCode, exp: user.exp, level: user.level, achievements: user.achievements } });
   } catch (error) {
     res.status(500).json({ message: 'Lỗi máy chủ' });
   }

@@ -132,6 +132,16 @@ const createTestPayment = async (req, res) => {
           sendOrderConfirmation(userDoc.email, order);
         }
       } catch (emailErr) {}
+
+      try {
+        const { addExpAndCheckBadges } = require("../utils/leveling");
+        const allOrders = await Order.find({ user: userId, status: 'completed' });
+        let totalGamesBought = 0;
+        allOrders.forEach(o => totalGamesBought += o.items.length);
+        await addExpAndCheckBadges(userId, 50 * order.items.length, { gamesBought: totalGamesBought });
+      } catch (e) {
+        console.error("Leveling error:", e);
+      }
     } catch (orderError) {}
     
     res.json({
@@ -302,6 +312,16 @@ const createOrderFromSession = async (req, res) => {
       const userDoc = await User.findById(userId).select('email');
       if (userDoc?.email) sendOrderConfirmation(userDoc.email, order);
     } catch (e) {}
+
+    try {
+      const { addExpAndCheckBadges } = require("../utils/leveling");
+      const allOrders = await Order.find({ user: userId, status: 'completed' });
+      let totalGamesBought = 0;
+      allOrders.forEach(o => totalGamesBought += o.items.length);
+      await addExpAndCheckBadges(userId, 50 * order.items.length, { gamesBought: totalGamesBought });
+    } catch (e) {
+      console.error("Leveling error:", e);
+    }
     
     res.status(201).json(order);
   } catch (error) {
@@ -364,6 +384,16 @@ const handleStripeWebhook = async (req, res) => {
               if (userDoc?.email) sendOrderConfirmation(userDoc.email, order);
             } catch (e) {}
             await syncAnalytics(order);
+
+            try {
+              const { addExpAndCheckBadges } = require("../utils/leveling");
+              const allOrders = await Order.find({ user: userId, status: 'completed' });
+              let totalGamesBought = 0;
+              allOrders.forEach(o => totalGamesBought += o.items.length);
+              await addExpAndCheckBadges(userId, 50 * order.items.length, { gamesBought: totalGamesBought });
+            } catch (e) {
+              console.error("Leveling error:", e);
+            }
           }
         }
       } catch (error) {}

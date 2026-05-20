@@ -42,22 +42,26 @@ Một nền tảng thương mại điện tử chuyên về game với đầy đ
 
 ```
 Gamestore/
-├── my-ecommerce-api/          # Backend API Server
-│   ├── server.js              # Main server file
-│   ├── models/                # MongoDB models
-│   ├── routes/                # API routes
-│   └── package.json
+├── src/                       # Backend Source Code
+│   ├── controllers/           # Xử lý logic của các API
+│   ├── models/                # Schema database (MongoDB)
+│   ├── routes/                # Định nghĩa các endpoints API
+│   ├── middlewares/           # Xử lý trung gian (Auth, Error handler, v.v.)
+│   ├── utils/                 # Các hàm hỗ trợ dùng chung
+│   └── validations/           # Schema validate dữ liệu (Zod)
 ├── my-ecommerce-app/          # Frontend React App
 │   ├── src/
-│   │   ├── components/        # React components
-│   │   ├── pages/            # Page components
-│   │   ├── hooks/            # Custom hooks
-│   │   └── utils/            # Utility functions
-│   ├── public/               # Static assets
-│   └── package.json
-├── .env                      # Environment variables
-├── package.json              # Root package.json
-└── README.md                 # This file
+│   │   ├── components/        # Các UI component tái sử dụng
+│   │   ├── pages/             # Các trang của ứng dụng
+│   │   ├── context/           # Quản lý Global State (Context API)
+│   │   ├── assets/            # Hình ảnh, font chữ, v.v.
+│   │   └── utils/             # Các hàm hỗ trợ frontend
+│   ├── public/                # Static assets
+│   └── package.json           # Cấu hình package frontend
+├── server.js                  # Điểm khởi chạy của Backend Server
+├── .env                       # Biến môi trường
+├── package.json               # Cấu hình package backend
+└── README.md                  # File tài liệu này
 ```
 
 ## 🚀 Hướng dẫn cài đặt và chạy
@@ -77,17 +81,16 @@ cd Gamestore
 
 ### 2. Cài đặt dependencies
 
-#### Backend dependencies:
+#### Backend dependencies (thực hiện tại thư mục gốc):
 
 ```bash
-cd my-ecommerce-api
 npm install
 ```
 
 #### Frontend dependencies:
 
 ```bash
-cd ../my-ecommerce-app
+cd my-ecommerce-app
 npm install
 ```
 
@@ -143,10 +146,9 @@ JWT_SECRET=your-secret-key-here
 
 #### Cách 1: Chạy từng phần riêng biệt
 
-**Backend Server:**
+**Backend Server (Mở terminal tại thư mục gốc):**
 
 ```bash
-cd my-ecommerce-api
 npm start
 # hoặc
 npm run dev
@@ -165,10 +167,9 @@ App sẽ chạy tại: `http://localhost:5173`
 
 #### Cách 2: Chạy đồng thời (mở 2 terminal)
 
-**Terminal 1 - Backend:**
+**Terminal 1 - Backend (Mở tại thư mục gốc):**
 
 ```bash
-cd my-ecommerce-api
 npm start
 ```
 
@@ -188,8 +189,8 @@ npm run dev
 3. Create New → Web Service
 4. Connect GitHub repository
 5. Cấu hình:
-   - **Build Command**: `cd my-ecommerce-api && npm install`
-   - **Start Command**: `cd my-ecommerce-api && npm start`
+   - **Build Command**: `npm install`
+   - **Start Command**: `npm start`
    - **Instance Type**: Free (hoặc paid cho production)
 6. Add Environment Variables trong Render Dashboard:
    ```
@@ -222,7 +223,7 @@ npm run dev
 
 Sau khi deploy, cần cập nhật:
 
-1. Trong `my-ecommerce-api/server.js`:
+1. Trong `server.js`:
 
    ```javascript
    const cors = require("cors");
@@ -245,6 +246,29 @@ Sau khi deploy, cần cập nhật:
    const API_BASE_URL =
      import.meta.env.VITE_API_URL || "https://your-api.onrender.com";
    ```
+
+## 🔄 Luồng hoạt động của hệ thống (System Flow)
+
+Dự án áp dụng mô hình **Client-Server** truyền thống kết hợp với **Real-time** và **AI**, dưới đây là cách các luồng dữ liệu chính tương tác:
+
+1. **Luồng xử lý API chung (Mô hình MVC):**
+   - **Client (React)** gọi HTTP request gửi đến Backend.
+   - **Router** (`src/routes/`) tại backend tiếp nhận request và chuyển hướng đến Controller tương ứng.
+   - **Middleware** xen ngang ở giữa để đảm bảo an toàn: xác thực token (JWT), phân quyền (Admin/User), hoặc validate dữ liệu gửi lên với Zod.
+   - **Controller** (`src/controllers/`) xử lý logic nghiệp vụ, gọi đến **Model** (`src/models/`) để lấy/ghi dữ liệu vào **MongoDB**.
+   - Cuối cùng, Controller đóng gói dữ liệu kết quả thành JSON và phản hồi về cho Client hiển thị.
+
+2. **Luồng Thanh toán trực tuyến (Stripe):**
+   - Khách hàng bấm thanh toán, Client gửi thông tin sản phẩm trong giỏ hàng lên Backend.
+   - Backend sử dụng SDK để gọi API của Stripe tạo một phiên thanh toán (`Checkout Session`).
+   - Backend trả link thanh toán về cho Client, Client chuyển hướng người dùng sang trang thanh toán bảo mật của Stripe.
+   - Sau khi thanh toán thành công, Stripe tự động redirect người dùng quay lại trang web của ta.
+
+3. **Luồng AI Chatbot (Google Gemini + Realtime):**
+   - Người dùng gõ tin nhắn trên giao diện.
+   - Tin nhắn đẩy qua kết nối **Socket.io** (hoặc API) lên Server.
+   - Server nhận câu hỏi, bổ sung các ngữ cảnh (System Prompt) và gửi yêu cầu cho API của **Google Gemini**.
+   - Khi Gemini trả về câu trả lời, Server lập tức dùng Socket.io đẩy ngược realtime về Client để hiển thị trên khung chat.
 
 ## 🔗 API Endpoints chính
 
@@ -393,9 +417,9 @@ Trước khi chấm điểm, hãy kiểm tra:
 
 ### ✅ Files quan trọng cần xem
 
-- `my-ecommerce-api/server.js` - Main backend logic
+- `server.js` - Main backend logic
 - `my-ecommerce-app/src/` - Frontend components
-- `my-ecommerce-api/models/` - Database schemas
+- `src/models/` - Database schemas
 - `.env.example` - Environment template
 
 ---
