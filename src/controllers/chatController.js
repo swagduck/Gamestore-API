@@ -4,6 +4,7 @@ const User = require("../models/User.js");
 const Order = require("../models/Order.js");
 const Message = require("../models/Message.js");
 const jwt = require("jsonwebtoken");
+const { decrypt } = require("../utils/encryption");
 
 // Initialize Google AI
 const geminiKey = (process.env.GEMINI_API_KEY || "").trim();
@@ -160,7 +161,10 @@ const getChatHistory = async (req, res) => {
       { $set: { read: true } }
     );
 
-    res.json({ messages: messages.reverse() });
+    // Giải mã nội dung tin nhắn
+    const decryptedMessages = messages.map(m => ({ ...m, content: decrypt(m.content) }));
+
+    res.json({ messages: decryptedMessages });
   } catch (error) {
     console.error('Lỗi lấy lịch sử chat:', error);
     res.status(500).json({ message: 'Lỗi máy chủ' });
@@ -195,7 +199,7 @@ const getConversations = async (req, res) => {
 
         return {
           friend,
-          lastMessage,
+          lastMessage: lastMessage ? { ...lastMessage, content: decrypt(lastMessage.content) } : null,
           unreadCount,
         };
       })

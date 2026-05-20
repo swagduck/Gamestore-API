@@ -14,6 +14,7 @@ const { createClient } = require('redis');
 const mongoSanitize = require('express-mongo-sanitize');
 const jwt = require('jsonwebtoken');
 const Message = require('./src/models/Message');
+const { encrypt, decrypt } = require('./src/utils/encryption');
 
 // Route imports
 const gameRoutes = require('./src/routes/gameRoutes');
@@ -207,13 +208,15 @@ io.on('connection', (socket) => {
       if (!receiverId || !/^[a-f\d]{24}$/i.test(receiverId)) return socket.emit('message_error', { message: 'Người nhận không hợp lệ' });
       if (receiverId === userId) return socket.emit('message_error', { message: 'Không thể nhắn tin cho chính mình' });
 
-      const message = await Message.create({ sender: userId, receiver: receiverId, content: content.trim() });
+      const encryptedContent = encrypt(content.trim());
+      const message = await Message.create({ sender: userId, receiver: receiverId, content: encryptedContent });
       const User = require('./src/models/User');
       const senderUser = await User.findById(userId).select('name avatar');
 
       const messageData = {
         _id: message._id, sender: userId, senderName: senderUser ? senderUser.name : 'Người dùng',
-        receiver: receiverId, content: message.content, read: false, createdAt: message.createdAt,
+        receiver: receiverId, content: content.trim(), // gửi plaintext qua socket
+        read: false, createdAt: message.createdAt,
       };
 
       // Gửi bằng Redis Adapter thông qua Room (io.to)
