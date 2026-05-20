@@ -43,7 +43,8 @@ const GameSchema = new mongoose.Schema({
   discountEndDate: {
     type: Date
   }
-});
+}, { timestamps: true });
+
 
 // Thêm text index để tối ưu hóa tìm kiếm
 GameSchema.index({ name: "text", description: "text", genre: "text" });

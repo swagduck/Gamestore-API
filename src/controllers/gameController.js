@@ -12,7 +12,7 @@ const getAllGames = async (req, res) => {
     }
     const { limit, sort } = req.query;
     // createdAt luôn sắp xếp mới nhất trước (desc), rating cũng desc
-    const order = sort === 'createdAt' || sort === 'rating' ? 'desc' : (req.query.order || 'desc');
+    const order = sort === 'createdAt' || sort === 'rating' || sort === '_id' ? 'desc' : (req.query.order || 'desc');
     const cacheKey = `games_${limit || 'all'}_${sort || 'none'}_${order}`;
     
     if (redisClient && redisClient.isOpen) {
