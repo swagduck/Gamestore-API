@@ -161,8 +161,8 @@ const getChatHistory = async (req, res) => {
       { $set: { read: true } }
     );
 
-    // Giải mã nội dung tin nhắn
-    const decryptedMessages = messages.map(m => ({ ...m, content: decrypt(m.content) }));
+    // Giải mã và đảo lại thứ tự: cũ nhất ở trên, mới nhất ở dưới
+    const decryptedMessages = messages.reverse().map(m => ({ ...m, content: decrypt(m.content) }));
 
     res.json({ messages: decryptedMessages });
   } catch (error) {
