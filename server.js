@@ -70,6 +70,11 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 app.use(cors(corsOptions));
+
+// --- Stripe Webhook MUST be placed before express.json() ---
+const orderController = require('./src/controllers/orderController');
+app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), orderController.handleStripeWebhook);
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());

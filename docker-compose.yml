@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: gamestore-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gamestore-backend
+    ports:
+      - "4000:4000"
+    environment:
+      - MONGO_URI=mongodb://mongodb:27017/gameDatabase?authSource=admin
+      - PORT=4000
+      - FRONTEND_URL=http://localhost:5173
+      - JWT_SECRET=gamestore_secret_key_demo
+    depends_on:
+      - mongodb
+
+  frontend:
+    build:
+      context: ./my-ecommerce-app
+      dockerfile: Dockerfile
+    container_name: gamestore-frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:4000
+    depends_on:
+      - backend
+
+volumes:
+  mongodb_data:

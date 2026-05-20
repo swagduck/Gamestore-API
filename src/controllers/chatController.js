@@ -121,7 +121,7 @@ LUÔN TRẢ VỀ JSON HỢP LỆ! TUYỆT ĐỐI KHÔNG xuất kết quả tìm 
       const dbQuery = {};
       if (aiJson.query.genre) dbQuery.genre = { $regex: new RegExp(aiJson.query.genre, "i") };
       if (aiJson.query.platform) dbQuery.platform = { $regex: new RegExp(aiJson.query.platform, "i") };
-      if (aiJson.query.name) dbQuery.name = { $regex: new RegExp(aiJson.query.name, "i") };
+      if (aiJson.query.name) dbQuery.$text = { $search: aiJson.query.name };
       
       gameResults = await Game.find(dbQuery).limit(5);
     }

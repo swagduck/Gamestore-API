@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const Game = require("../models/Game");
 const NodeCache = require("node-cache");
+const { cloudinary } = require("../utils/cloudinary");
 const myCache = new NodeCache({ stdTTL: 300, checkperiod: 120 });
 
 const getAllGames = async (req, res) => {
@@ -117,8 +118,22 @@ const addGame = async (req, res) => {
 
 const updateGame = async (req, res) => {
   try {
+    const oldGame = await Game.findById(req.params.id);
+    if (!oldGame) return res.status(404).json({ message: "Không tìm thấy game để cập nhật" });
+    
+    // Xóa ảnh cũ trên Cloudinary nếu người dùng nhập link ảnh mới
+    if (req.body.image && req.body.image !== oldGame.image) {
+      if (oldGame.image && oldGame.image.includes('cloudinary.com') && oldGame.image.includes('/gamestore_avatars/')) {
+        try {
+          const publicId = 'gamestore_avatars/' + oldGame.image.split('/gamestore_avatars/')[1].split('.')[0];
+          await cloudinary.uploader.destroy(publicId);
+        } catch (err) {
+          console.error('Error deleting old image on Cloudinary:', err);
+        }
+      }
+    }
+
     const updatedGame = await Game.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
-    if (!updatedGame) return res.status(404).json({ message: "Không tìm thấy game để cập nhật" });
     res.json(updatedGame);
   } catch (err) {
     if (err.name === "ValidationError") return res.status(400).json({ message: err.message });
@@ -131,6 +146,16 @@ const deleteGame = async (req, res) => {
   try {
     const deletedGame = await Game.findByIdAndDelete(req.params.id);
     if (!deletedGame) return res.status(404).json({ message: "Không tìm thấy game để xóa" });
+    
+    if (deletedGame.image && deletedGame.image.includes('cloudinary.com') && deletedGame.image.includes('/gamestore_avatars/')) {
+      try {
+        const publicId = 'gamestore_avatars/' + deletedGame.image.split('/gamestore_avatars/')[1].split('.')[0];
+        await cloudinary.uploader.destroy(publicId);
+      } catch (err) {
+        console.error('Error deleting image on Cloudinary:', err);
+      }
+    }
+
     res.json({ message: "Đã xóa game thành công" });
   } catch (err) {
     if (err.name === "CastError") return res.status(400).json({ message: "ID game không hợp lệ." });

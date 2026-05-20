@@ -4,7 +4,7 @@ const orderController = require('../controllers/orderController');
 const { verifyToken, verifyAdmin } = require('../middlewares/authMiddleware');
 
 // Public/Webhook
-router.post('/stripe/webhook', express.raw({type: 'application/json'}), orderController.handleStripeWebhook);
+// (Đã chuyển qua server.js để lấy raw body)
 
 // User Order Management
 router.post('/create-test-payment', verifyToken, orderController.createTestPayment);
