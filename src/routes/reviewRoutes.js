@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router({ mergeParams: true });
 const reviewController = require('../controllers/reviewController');
 const { verifyToken } = require('../middlewares/authMiddleware');
+const { reviewLimiter } = require('../middlewares/rateLimiter');
 
 // Note: /api/games/:id/reviews and /api/reviews/:id are mixed in standard layout.
 // I'll group them for simplicity, assuming base route is /api/reviews and we proxy games reviews.
@@ -12,7 +13,7 @@ const { verifyToken } = require('../middlewares/authMiddleware');
 // POST /api/reviews/:id/report
 
 router.get('/games/:id/reviews', reviewController.getReviewsForGame);
-router.post('/games/:id/reviews', verifyToken, reviewController.addReview);
+router.post('/games/:id/reviews', verifyToken, reviewLimiter, reviewController.addReview);
 router.put('/reviews/:id/helpful', reviewController.markReviewHelpful);
 router.post('/reviews/:id/report', reviewController.reportReview);
 

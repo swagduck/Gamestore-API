@@ -29,5 +29,25 @@ const authLimiter = skipInTest(rateLimit({
   legacyHeaders: false,
 }));
 
-module.exports = { checkRateLimit, authLimiter };
+const friendRequestLimiter = skipInTest(rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 giờ
+  max: 20, // Tối đa 20 lời mời kết bạn mỗi giờ
+  message: {
+    message: "Bạn đã gửi quá nhiều lời mời kết bạn. Vui lòng thử lại sau 1 giờ."
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+}));
+
+const reviewLimiter = skipInTest(rateLimit({
+  windowMs: 24 * 60 * 60 * 1000, // 24 giờ
+  max: 10, // Tối đa 10 review mỗi ngày
+  message: {
+    message: "Bạn đã gửi quá nhiều đánh giá hôm nay. Vui lòng thử lại vào ngày mai."
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+}));
+
+module.exports = { checkRateLimit, authLimiter, friendRequestLimiter, reviewLimiter };
 

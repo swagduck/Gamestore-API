@@ -63,6 +63,19 @@ const getUnreadCount = async (req, res) => {
   }
 };
 
+const markAllAsRead = async (req, res) => {
+  try {
+    await Notification.updateMany(
+      { user: req.user._id, read: false },
+      { read: true, readAt: new Date() }
+    );
+    res.json({ message: "Đã đánh dấu tất cả thông báo là đã đọc." });
+  } catch (error) {
+    console.error("Lỗi khi đánh dấu tất cả đã đọc:", error);
+    res.status(500).json({ message: "Lỗi máy chủ." });
+  }
+};
+
 const createNotification = async (req, res) => {
   try {
     const { userId, type, title, message, data, priority = "medium" } = req.body;
@@ -98,6 +111,7 @@ const createNotification = async (req, res) => {
 module.exports = {
   getNotifications,
   markAsRead,
+  markAllAsRead,
   getUnreadCount,
   createNotification
 };

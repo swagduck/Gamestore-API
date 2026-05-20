@@ -17,7 +17,10 @@ const NotificationSchema = new mongoose.Schema(
         "wishlist_update",
         "review_response",
         "system",
-        "promotion"
+        "promotion",
+        "friend_request",
+        "friend_accepted",
+        "new_message"
       ],
     },
     title: {
