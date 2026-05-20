@@ -13,5 +13,6 @@ router.post('/forgot-password', authLimiter, authController.forgotPassword); // 
 router.post('/reset-password', authLimiter, authController.resetPassword);   // bảo vệ khỏi brute-force token
 router.post('/logout', authController.logout);
 router.get('/me', verifyToken, authController.getMe);
+router.post('/refresh', verifyToken, authController.refreshToken);
 
 module.exports = router;

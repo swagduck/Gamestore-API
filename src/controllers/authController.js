@@ -19,7 +19,7 @@ const cookieOptions = {
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
   sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
-  maxAge: 60 * 60 * 1000 // 1 hour
+  maxAge: 7 * 24 * 60 * 60 * 1000 // 7 ngày
 };
 
 const register = async (req, res) => {
@@ -41,7 +41,7 @@ const register = async (req, res) => {
     const token = jwt.sign(
       { userId: savedUser._id, email: savedUser.email, isAdmin: savedUser.isAdmin },
       process.env.JWT_SECRET,
-      { expiresIn: "1h" }
+      { expiresIn: "7d" }
     );
     res.cookie('token', token, cookieOptions).status(201).json({
       message: "Đăng ký thành công!",
@@ -72,7 +72,7 @@ const login = async (req, res) => {
     const token = jwt.sign(
       { userId: user._id, email: user.email, isAdmin: user.isAdmin },
       process.env.JWT_SECRET,
-      { expiresIn: "1h" }
+      { expiresIn: "7d" }
     );
 
     res.cookie('token', token, cookieOptions).json({
@@ -118,7 +118,7 @@ const googleLogin = async (req, res) => {
     const gamestoreToken = jwt.sign(
       { userId: user._id, email: user.email, isAdmin: user.isAdmin },
       process.env.JWT_SECRET,
-      { expiresIn: "1h" }
+      { expiresIn: "7d" }
     );
     res.cookie('token', gamestoreToken, cookieOptions).json({
       message: "Đăng nhập bằng Google thành công!",
@@ -181,6 +181,23 @@ const logout = (req, res) => {
   res.clearCookie('token', cookieOptions).json({ message: 'Đã đăng xuất thành công' });
 };
 
+// Auto-refresh token nếu còn dưới 1 ngày hiệu lực
+const refreshToken = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select('-password');
+    if (!user) return res.status(404).json({ message: 'Không tìm thấy người dùng' });
+
+    const newToken = jwt.sign(
+      { userId: user._id, email: user.email, isAdmin: user.isAdmin },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+    res.cookie('token', newToken, cookieOptions).json({ message: 'Token đã được làm mới' });
+  } catch (error) {
+    res.status(500).json({ message: 'Lỗi máy chủ' });
+  }
+};
+
 const getMe = async (req, res) => {
   try {
     const user = await User.findById(req.user._id).select('-password');
@@ -197,4 +214,4 @@ const getMe = async (req, res) => {
   }
 };
 
-module.exports = { register, login, googleLogin, forgotPassword, resetPassword, logout, getMe };
+module.exports = { register, login, googleLogin, forgotPassword, resetPassword, logout, getMe, refreshToken };
