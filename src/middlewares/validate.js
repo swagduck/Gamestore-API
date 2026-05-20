@@ -1,10 +1,15 @@
+const { ZodError } = require('zod');
+
 const validate = (schema) => (req, res, next) => {
   try {
-    schema.parse(req.body);
+    req.body = schema.parse(req.body);
     next();
   } catch (err) {
-    const errorMessages = err.errors.map(e => e.message).join(', ');
-    return res.status(400).json({ message: errorMessages });
+    if (err instanceof ZodError) {
+      const errorMessages = err.issues.map(e => e.message).join(', ');
+      return res.status(400).json({ message: errorMessages });
+    }
+    return res.status(400).json({ message: "Dữ liệu không hợp lệ" });
   }
 };
 

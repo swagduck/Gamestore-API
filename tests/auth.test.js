@@ -30,7 +30,7 @@ describe('Auth — Register', () => {
   test('POST /api/auth/register với body hợp lệ → 201', async () => {
     const res = await request(app)
       .post('/api/auth/register')
-      .send({ username: 'testuser', email: 'test@example.com', password: 'Password123!' });
+      .send({ name: 'testuser', email: 'test@example.com', password: 'Password123!' });
 
     // Có thể 201 hoặc 200 tùy controller
     expect([200, 201]).toContain(res.status);
@@ -40,12 +40,12 @@ describe('Auth — Register', () => {
     // Register lần 1
     await request(app)
       .post('/api/auth/register')
-      .send({ username: 'user1', email: 'dup@example.com', password: 'Password123!' });
+      .send({ name: 'user1', email: 'dup@example.com', password: 'Password123!' });
 
     // Register lần 2 cùng email
     const res = await request(app)
       .post('/api/auth/register')
-      .send({ username: 'user2', email: 'dup@example.com', password: 'Password456!' });
+      .send({ name: 'user2', email: 'dup@example.com', password: 'Password456!' });
 
     expect(res.status).toBe(400);
   });
@@ -53,7 +53,7 @@ describe('Auth — Register', () => {
   test('POST /api/auth/register thiếu password → 400', async () => {
     const res = await request(app)
       .post('/api/auth/register')
-      .send({ username: 'nopass', email: 'nopass@example.com' });
+      .send({ name: 'nopass', email: 'nopass@example.com' });
 
     expect(res.status).toBe(400);
   });
@@ -67,7 +67,7 @@ describe('Auth — Login', () => {
     // Tạo user để test login
     await request(app)
       .post('/api/auth/register')
-      .send({ username: 'loginuser', email: 'login@example.com', password: 'Password123!' });
+      .send({ name: 'loginuser', email: 'login@example.com', password: 'Password123!' });
   });
 
   test('POST /api/auth/login đúng credentials → 200 + set cookie', async () => {
@@ -118,7 +118,7 @@ describe('Auth — Me (Protected)', () => {
     // Register + login để lấy cookie
     await request(app)
       .post('/api/auth/register')
-      .send({ username: 'meuser', email: 'me@example.com', password: 'Password123!' });
+      .send({ name: 'meuser', email: 'me@example.com', password: 'Password123!' });
 
     const loginRes = await request(app)
       .post('/api/auth/login')
