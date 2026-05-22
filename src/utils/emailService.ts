@@ -126,7 +126,7 @@ const buildOrderEmailHTML = (order, userEmail) => {
               <table width="100%" cellpadding="0" cellspacing="0" border="0">
                 <tr>
                   <td align="center">
-                    <a href="${frontendBase}/orders" style="display: inline-block; background: linear-gradient(135deg, #4f46e5 0%, #9333ea 100%); color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 700; padding: 16px 40px; border-radius: 30px; text-transform: uppercase; letter-spacing: 1px;">
+                    <a href="${frontendBase}/library" style="display: inline-block; background: linear-gradient(135deg, #4f46e5 0%, #9333ea 100%); color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 700; padding: 16px 40px; border-radius: 30px; text-transform: uppercase; letter-spacing: 1px;">
                       Vào thư viện của bạn
                     </a>
                   </td>
