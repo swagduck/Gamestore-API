@@ -277,7 +277,7 @@ const createOrderFromSession = async (req: Request, res: Response) => {
     if (existingOrder) {
       try {
         const userDoc = await User.findById(userId).select('email');
-        if (userDoc?.email as string) sendOrderConfirmation(userDoc.email, existingOrder).catch(err => console.error('Email error:', err));
+        if (userDoc && userDoc.email) sendOrderConfirmation(userDoc.email as string, existingOrder).catch(err => console.error('Email error:', err));
       } catch (e) {}
       return res.json(existingOrder);
     }
@@ -333,7 +333,7 @@ const createOrderFromSession = async (req: Request, res: Response) => {
 
     try {
       const userDoc = await User.findById(userId).select('email');
-      if (userDoc?.email as string) sendOrderConfirmation(userDoc.email, order).catch(err => console.error('Email error:', err));
+      if (userDoc && userDoc.email) sendOrderConfirmation(userDoc.email as string, order).catch(err => console.error('Email error:', err));
     } catch (e) {}
 
     try {
@@ -405,7 +405,7 @@ const handleStripeWebhook = async (req: Request, res: Response) => {
             await order.save();
             try {
               const userDoc = await User.findById(userId).select('email');
-              if (userDoc?.email as string) sendOrderConfirmation(userDoc.email, order).catch(err => console.error('Email error:', err));
+              if (userDoc && userDoc.email) sendOrderConfirmation(userDoc.email as string, order).catch(err => console.error('Email error:', err));
             } catch (e) {}
             await syncAnalytics(order);
 
