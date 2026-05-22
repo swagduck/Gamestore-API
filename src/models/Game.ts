@@ -46,8 +46,24 @@ const GameSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 
-// Thêm text index để tối ưu hóa tìm kiếm
+// Text index để tối ưu hóa tìm kiếm toàn văn
 GameSchema.index({ name: "text", description: "text", genre: "text" });
+
+// Compound Indexes để tối ưu hóa truy vấn lọc và sắp xếp
+// Dùng cho: Lọc theo thể loại + sắp xếp theo đánh giá (trang CategoryPage)
+GameSchema.index({ genre: 1, rating: -1 });
+
+// Dùng cho: Lọc theo nền tảng + sắp xếp theo giá (trang CategoryPage)
+GameSchema.index({ platform: 1, price: 1 });
+
+// Dùng cho: Tính năng khuyến mãi - getDiscountedGames (trang HomePage)
+GameSchema.index({ discountType: 1, discountStartDate: 1, discountEndDate: 1 });
+
+// Dùng cho: Sắp xếp theo ngày tạo mới nhất (trang chủ)
+GameSchema.index({ createdAt: -1 });
+
+// Dùng cho: Sắp xếp theo lượt xem (trending)
+GameSchema.index({ viewCount: -1 });
 
 // Method to get final price (free or discounted)
 GameSchema.methods.getFinalPrice = function() {
