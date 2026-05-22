@@ -62,25 +62,32 @@ const createTestPayment = async (req: Request, res: Response) => {
   try {
     const { cartItems } = req.body;
     const userId = (req as any).user._id;
+
+    // Lấy thông tin game từ DB để chống thao túng giá
+    const gameIds = cartItems.map((item: any) => item._id);
+    const gamesInDb = await Game.find({ _id: { $in: gameIds } });
     
     const processedItems = cartItems.map((item: any) => {
-      let finalPrice = item.price;
-      if (item.discountType && item.discountType !== 'none') {
+      const dbGame = gamesInDb.find((g: any) => g._id.toString() === item._id);
+      if (!dbGame) throw new Error(`Không tìm thấy game: ${item.name}`);
+
+      let finalPrice = dbGame.price;
+      if (dbGame.discountType && dbGame.discountType !== 'none') {
         const now = new Date();
-        const start = item.discountStartDate ? new Date(item.discountStartDate) : null;
-        const end = item.discountEndDate ? new Date(item.discountEndDate) : null;
+        const start = dbGame.discountStartDate ? new Date(dbGame.discountStartDate) : null;
+        const end = dbGame.discountEndDate ? new Date(dbGame.discountEndDate) : null;
         const isDiscountActive = (!start || now >= start) && (!end || now <= end);
         if (isDiscountActive) {
-          if (item.discountType === 'percentage') {
-            finalPrice = item.price * (1 - item.discountValue / 100);
-          } else if (item.discountType === 'fixed') {
-            finalPrice = Math.max(0, item.price - item.discountValue);
+          if (dbGame.discountType === 'percentage') {
+            finalPrice = dbGame.price * (1 - (dbGame.discountValue || 0) / 100);
+          } else if (dbGame.discountType === 'fixed') {
+            finalPrice = Math.max(0, dbGame.price - (dbGame.discountValue || 0));
           }
         }
       }
       return {
-        name: item.name,
-        originalPrice: item.price,
+        name: dbGame.name,
+        originalPrice: dbGame.price,
         discountedPrice: finalPrice,
         quantity: item.quantity
       };
@@ -91,28 +98,31 @@ const createTestPayment = async (req: Request, res: Response) => {
     
     try {
       const orderItems = cartItems.map((item: any) => {
-        let finalPrice = item.price;
-        if (item.discountType && item.discountType !== 'none') {
+        const dbGame = gamesInDb.find((g: any) => g._id.toString() === item._id);
+        if (!dbGame) throw new Error(`Không tìm thấy game: ${item.name}`);
+
+        let finalPrice = dbGame.price;
+        if (dbGame.discountType && dbGame.discountType !== 'none') {
           const now = new Date();
-          const start = item.discountStartDate ? new Date(item.discountStartDate) : null;
-          const end = item.discountEndDate ? new Date(item.discountEndDate) : null;
+          const start = dbGame.discountStartDate ? new Date(dbGame.discountStartDate) : null;
+          const end = dbGame.discountEndDate ? new Date(dbGame.discountEndDate) : null;
           const isDiscountActive = (!start || now >= start) && (!end || now <= end);
           if (isDiscountActive) {
-            if (item.discountType === 'percentage') {
-              finalPrice = item.price * (1 - item.discountValue / 100);
-            } else if (item.discountType === 'fixed') {
-              finalPrice = Math.max(0, item.price - item.discountValue);
+            if (dbGame.discountType === 'percentage') {
+              finalPrice = dbGame.price * (1 - (dbGame.discountValue || 0) / 100);
+            } else if (dbGame.discountType === 'fixed') {
+              finalPrice = Math.max(0, dbGame.price - (dbGame.discountValue || 0));
             }
           }
         }
         return {
           game: item._id,
-          name: item.name,
-          price: item.price,
+          name: dbGame.name,
+          price: dbGame.price,
           quantity: item.quantity,
-          image: item.image,
-          discountType: item.discountType || 'none',
-          discountValue: item.discountValue || 0,
+          image: dbGame.image,
+          discountType: dbGame.discountType || 'none',
+          discountValue: dbGame.discountValue || 0,
           finalPrice: finalPrice
         };
       });
@@ -180,28 +190,35 @@ const createCheckoutSession = async (req: Request, res: Response) => {
       }
     }
 
+    // Fetch games from DB
+    const gameIds = cartItems.map((item: any) => item._id);
+    const gamesInDb = await Game.find({ _id: { $in: gameIds } });
+
     const line_items = cartItems.map((item: any) => {
-      let finalPrice = item.price;
-      if (item.discountType && item.discountType !== 'none') {
+      const dbGame = gamesInDb.find((g: any) => g._id.toString() === item._id);
+      if (!dbGame) throw new Error(`Không tìm thấy game: ${item.name}`);
+
+      let finalPrice = dbGame.price;
+      if (dbGame.discountType && dbGame.discountType !== 'none') {
         const now = new Date();
-        const start = item.discountStartDate ? new Date(item.discountStartDate) : null;
-        const end = item.discountEndDate ? new Date(item.discountEndDate) : null;
+        const start = dbGame.discountStartDate ? new Date(dbGame.discountStartDate) : null;
+        const end = dbGame.discountEndDate ? new Date(dbGame.discountEndDate) : null;
         const isDiscountActive = (!start || now >= start) && (!end || now <= end);
         if (isDiscountActive) {
-          if (item.discountType === 'percentage') {
-            finalPrice = item.price * (1 - item.discountValue / 100);
-          } else if (item.discountType === 'fixed') {
-            finalPrice = Math.max(0, item.price - item.discountValue);
+          if (dbGame.discountType === 'percentage') {
+            finalPrice = dbGame.price * (1 - (dbGame.discountValue || 0) / 100);
+          } else if (dbGame.discountType === 'fixed') {
+            finalPrice = Math.max(0, dbGame.price - (dbGame.discountValue || 0));
           }
         }
       }
 
-      let imageUrl = item.image;
+      let imageUrl = dbGame.image;
       if (typeof imageUrl !== "string" || !imageUrl.startsWith("http")) {
         if (typeof imageUrl === "string" && imageUrl.startsWith("/")) {
           imageUrl = `${process.env.FRONTEND_URL}${imageUrl}`;
         } else {
-          imageUrl = "https://via.placeholder.com/200x200?text=" + encodeURIComponent(item.name);
+          imageUrl = "https://via.placeholder.com/200x200?text=" + encodeURIComponent(dbGame.name);
         }
       }
 
@@ -209,15 +226,15 @@ const createCheckoutSession = async (req: Request, res: Response) => {
         price_data: {
           currency: "usd",
           product_data: {
-            name: item.name,
+            name: dbGame.name,
             images: [imageUrl],
             metadata: {
-              platform: Array.isArray(item.platform) ? item.platform.join(", ") : item.platform,
-              id: item._id,
-              originalPrice: item.price,
-              discountedPrice: finalPrice,
-              discountType: item.discountType || 'none',
-              discountValue: item.discountValue || 0,
+              platform: Array.isArray(dbGame.platform) ? dbGame.platform.join(", ") : dbGame.platform,
+              id: dbGame._id.toString(),
+              originalPrice: dbGame.price.toString(),
+              discountedPrice: finalPrice.toString(),
+              discountType: dbGame.discountType || 'none',
+              discountValue: (dbGame.discountValue || 0).toString(),
             },
           },
           unit_amount: Math.round(finalPrice * 100),
@@ -264,34 +281,37 @@ const createOrderFromSession = async (req: Request, res: Response) => {
       return res.json(existingOrder);
     }
     
+    const gameIds = cartItems.map((item: any) => item._id);
+    const gamesInDb = await Game.find({ _id: { $in: gameIds } });
+
     let totalAmount = 0;
     const orderItems = cartItems.map((item: any) => {
-      let finalPrice = item.price;
-      if (!item._id || !item.name || item.price === undefined || !item.quantity) {
-        throw new Error(`Item thiếu thông tin bắt buộc: ${JSON.stringify(item)}`);
-      }
-      if (item.discountType && item.discountType !== 'none') {
+      const dbGame = gamesInDb.find((g: any) => g._id.toString() === item._id);
+      if (!dbGame) throw new Error(`Không tìm thấy game: ${item.name}`);
+
+      let finalPrice = dbGame.price;
+      if (dbGame.discountType && dbGame.discountType !== 'none') {
         const now = new Date();
-        const start = item.discountStartDate ? new Date(item.discountStartDate) : null;
-        const end = item.discountEndDate ? new Date(item.discountEndDate) : null;
+        const start = dbGame.discountStartDate ? new Date(dbGame.discountStartDate) : null;
+        const end = dbGame.discountEndDate ? new Date(dbGame.discountEndDate) : null;
         const isDiscountActive = (!start || now >= start) && (!end || now <= end);
         if (isDiscountActive) {
-          if (item.discountType === 'percentage') {
-            finalPrice = item.price * (1 - item.discountValue / 100);
-          } else if (item.discountType === 'fixed') {
-            finalPrice = Math.max(0, item.price - item.discountValue);
+          if (dbGame.discountType === 'percentage') {
+            finalPrice = dbGame.price * (1 - (dbGame.discountValue || 0) / 100);
+          } else if (dbGame.discountType === 'fixed') {
+            finalPrice = Math.max(0, dbGame.price - (dbGame.discountValue || 0));
           }
         }
       }
       totalAmount += finalPrice * item.quantity;
       return {
         game: item._id,
-        name: item.name,
-        price: item.price,
+        name: dbGame.name,
+        price: dbGame.price,
         quantity: item.quantity,
-        image: item.image || '',
-        discountType: item.discountType || 'none',
-        discountValue: item.discountValue || 0,
+        image: dbGame.image || '',
+        discountType: dbGame.discountType || 'none',
+        discountValue: dbGame.discountValue || 0,
         finalPrice: finalPrice
       };
     });
@@ -510,14 +530,22 @@ const createOrder = async (req: Request, res: Response) => {
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: "Giỏ hàng trống" });
     }
+
+    // Only allow manual completed orders from admins, otherwise force pending
+    let finalStatus = status;
+    const user = (req as any).user;
+    if (status === 'completed' && !user.isAdmin) {
+      finalStatus = 'pending';
+    }
+
     const order = new Order({
-      user: (req as any).user._id,
+      user: user._id,
       orderNumber: generateOrderNumber(),
       items,
       totalAmount,
       paymentMethod,
       paymentId: paymentId || `manual_${Date.now()}`,
-      status
+      status: finalStatus
     });
     await order.save();
     try { await order.populate('items.game', 'name genre image rating'); } catch(e){}

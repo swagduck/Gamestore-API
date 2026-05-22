@@ -99,7 +99,7 @@ const googleLogin = async (req: Request, res: Response) => {
     let user = await User.findOne({ email });
 
     if (!user) {
-      const randomPassword = await bcrypt.hash(Math.random().toString(36).slice(-8) + Date.now().toString(), 10);
+      const randomPassword = await bcrypt.hash(crypto.randomBytes(16).toString('hex'), 10);
       const friendCode = await generateFriendCode();
       user = new User({ name, email, password: randomPassword, googleId, isAdmin: false, friendCode });
       await user.save();

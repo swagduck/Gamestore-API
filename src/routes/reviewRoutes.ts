@@ -14,7 +14,7 @@ import {  reviewLimiter  } from '../middlewares/rateLimiter';
 
 router.get('/games/:id/reviews', reviewController.getReviewsForGame);
 router.post('/games/:id/reviews', verifyToken, reviewLimiter, reviewController.addReview);
-router.put('/reviews/:id/helpful', reviewController.markReviewHelpful);
-router.post('/reviews/:id/report', reviewController.reportReview);
+router.put('/reviews/:id/helpful', verifyToken, reviewLimiter, reviewController.markReviewHelpful);
+router.post('/reviews/:id/report', verifyToken, reviewLimiter, reviewController.reportReview);
 
 export default router;
