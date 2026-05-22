@@ -29,8 +29,11 @@ FRONTEND_URL=https://your-frontend-url.vercel.app
 ## 📋 Deployment Steps
 
 1. **Push code to GitHub** (already done)
-2. **Add environment variables** in Render Dashboard
-3. **Trigger Manual Deploy** → "Deploy Latest Commit"
+2. **Go to Render Dashboard Settings**:
+   - Set **Build Command** to: `npm install && npm run build`
+   - Set **Start Command** to: `npm start`
+3. **Add environment variables** in Render Dashboard
+4. **Trigger Manual Deploy** → "Deploy Latest Commit"
 4. **Wait for deployment** to complete
 5. **Test API endpoints**:
    - `https://gamestore-api-whwx.onrender.com/api/test`
