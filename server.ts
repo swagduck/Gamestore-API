@@ -14,6 +14,8 @@ import { createAdapter } from '@socket.io/redis-adapter';
 import { createClient } from 'redis';
 import mongoSanitize from 'express-mongo-sanitize';
 import jwt from 'jsonwebtoken';
+import hpp from 'hpp';
+import rateLimit from 'express-rate-limit';
 
 // Extend Express Request
 declare global {
@@ -105,7 +107,21 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
+// Protect against NoSQL Injection
 app.use(mongoSanitize());
+
+// Protect against HTTP Parameter Pollution attacks
+app.use(hpp());
+
+// Global Rate Limiting for all /api routes
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 500, // limit each IP to 500 requests per windowMs
+  message: { message: "Quá nhiều yêu cầu từ IP này, vui lòng thử lại sau 15 phút." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/api', globalLimiter);
 
 const mongoOptions = {
   serverSelectionTimeoutMS: 5000,
