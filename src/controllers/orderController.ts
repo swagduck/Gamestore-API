@@ -1,7 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import Order from "../models/Order";
 import User from "../models/User";
-import stripe from "stripe";(process.env.STRIPE_SECRET_KEY);
+import Stripe from "stripe";
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
 import { sendOrderConfirmation } from "../utils/emailService";
 import { addExpAndCheckBadges } from "../utils/leveling";
 import Game from "../models/Game";
