@@ -164,7 +164,7 @@ const getChatHistory = async (req: Request, res: Response) => {
     );
 
     // Giải mã và đảo lại thứ tự: cũ nhất ở trên, mới nhất ở dưới
-    const decryptedMessages = messages.reverse().map((m: any) => ({ ...m, content: String(m.content) }));
+    const decryptedMessages = messages.reverse().map((m: any) => ({ ...m, content: decrypt(String(m.content)) }));
 
     res.json({ messages: decryptedMessages });
   } catch (error: any) {
@@ -201,7 +201,7 @@ const getConversations = async (req: Request, res: Response) => {
 
         return {
           friend,
-          lastMessage: lastMessage ? { ...lastMessage, content: String(lastMessage.content) } : null,
+          lastMessage: lastMessage ? { ...lastMessage, content: decrypt(String(lastMessage.content)) } : null,
           unreadCount,
         };
       })
