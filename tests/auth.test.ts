@@ -3,28 +3,28 @@
  * Kiểm tra các endpoint xác thực: register, login, me.
  * Dùng mongodb-memory-server (setup từ jest.config.js → tests/setup.js).
  */
-const request = require('supertest');
-const express = require('express');
-const cookieParser = require('cookie-parser');
-const mongoose = require('mongoose');
+import request from 'supertest';
+import express, { Request, Response, NextFunction } from 'express';
+import cookieParser from 'cookie-parser';
+import mongoose from 'mongoose';
+import { describe, beforeAll, beforeEach, test, expect } from '@jest/globals';
 
-// Import router và model thực tế
-const authRoutes = require('../src/routes/authRoutes');
-const User = require('../src/models/User');
+import authRoutes from '../src/routes/authRoutes';
+import User from '../src/models/User';
 
 function buildAuthApp() {
   const app = express();
   app.use(express.json());
   app.use(cookieParser());
   app.use('/api/auth', authRoutes);
-  app.use((err, req, res, next) => {
+  app.use((err: any, req: Request, res: Response, next: NextFunction) => {
     res.status(err.status || 500).json({ message: err.message });
   });
   return app;
 }
 
 describe('Auth — Register', () => {
-  let app;
+  let app: express.Express;
   beforeAll(() => { app = buildAuthApp(); });
 
   test('POST /api/auth/register với body hợp lệ → 201', async () => {
@@ -60,7 +60,7 @@ describe('Auth — Register', () => {
 });
 
 describe('Auth — Login', () => {
-  let app;
+  let app: express.Express;
   beforeAll(() => { app = buildAuthApp(); });
 
   beforeEach(async () => {
@@ -106,7 +106,7 @@ describe('Auth — Login', () => {
 });
 
 describe('Auth — Me (Protected)', () => {
-  let app;
+  let app: express.Express;
   beforeAll(() => { app = buildAuthApp(); });
 
   test('GET /api/auth/me không có token → 401', async () => {

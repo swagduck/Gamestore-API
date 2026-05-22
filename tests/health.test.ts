@@ -2,11 +2,12 @@
  * tests/health.test.js
  * Kiểm tra các endpoint cơ bản và health check của API.
  */
-const request = require('supertest');
-const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
-const cookieParser = require('cookie-parser');
+import request from 'supertest';
+import express, { Request, Response, NextFunction } from 'express';
+import mongoose from 'mongoose';
+import cors from 'cors';
+import cookieParser from 'cookie-parser';
+import { describe, beforeAll, test, expect } from '@jest/globals';
 
 // Build a minimal app for testing (không start httpServer)
 function buildApp() {
@@ -19,7 +20,7 @@ function buildApp() {
   });
 
   // Global error handler
-  app.use((err, req, res, next) => {
+  app.use((err: any, req: Request, res: Response, next: NextFunction) => {
     res.status(err.status || 500).json({ message: err.message || 'Internal Server Error' });
   });
 
@@ -27,7 +28,7 @@ function buildApp() {
 }
 
 describe('Health Check', () => {
-  let app;
+  let app: express.Express;
 
   beforeAll(() => {
     app = buildApp();

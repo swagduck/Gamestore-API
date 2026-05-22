@@ -3,10 +3,11 @@
  * Global Jest setup — dùng mongodb-memory-server để test offline,
  * không kết nối MongoDB Atlas thật.
  */
-const { MongoMemoryServer } = require('mongodb-memory-server');
-const mongoose = require('mongoose');
+import { MongoMemoryServer } from 'mongodb-memory-server';
+import mongoose from 'mongoose';
+import { beforeAll, afterEach, afterAll } from '@jest/globals';
 
-let mongoServer;
+let mongoServer: MongoMemoryServer;
 
 // Chạy trước toàn bộ test suite
 beforeAll(async () => {
